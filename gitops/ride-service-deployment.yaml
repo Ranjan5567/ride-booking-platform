@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: ride-service
-        image: ride-service:latest
+        image: <REGISTRY>/ride-service:latest
         ports:
         - containerPort: 8003
         env:
