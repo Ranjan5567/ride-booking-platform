@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ride-service
+  namespace: default
+  labels:
+    app: ride-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ride-service
+  template:
+    metadata:
+      labels:
+        app: ride-service
+    spec:
+      containers:
+      - name: ride-service
+        image: ride-service:latest
+        ports:
+        - containerPort: 8003
+        env:
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: host
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: name
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: user
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
+        - name: DB_PORT
+          value: "5432"
+        - name: PAYMENT_SERVICE_URL
+          value: "http://payment-service:80"
+        - name: LAMBDA_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: lambda_api_url
+        - name: EVENTHUB_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: azure-credentials
+              key: eventhub_connection_string
+        - name: DISABLE_NOTIFICATIONS
+          value: "false"
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ride-service
+  namespace: default
+spec:
+  selector:
+    app: ride-service
+  ports:
+  - port: 80
+    targetPort: 8003
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ride-service-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ride-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+

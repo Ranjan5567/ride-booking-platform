@@ -1,0 +1,48 @@
+{
+  "dashboard": {
+    "title": "Ride Booking Platform Dashboard",
+    "panels": [
+      {
+        "title": "CPU Usage - Ride Service",
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{pod=~\"ride-service.*\"}[5m])",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "HPA Pod Count - Ride Service",
+        "targets": [
+          {
+            "expr": "kube_deployment_status_replicas{deployment=\"ride-service\"}",
+            "legendFormat": "Replicas"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Request Rate",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Error Rate",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "type": "graph"
+      }
+    ]
+  }
+}
+
