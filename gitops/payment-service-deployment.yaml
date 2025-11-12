@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: payment-service
-        image: payment-service:latest
+        image: <REGISTRY>/user-service:latest
         ports:
         - containerPort: 8004
         resources:
