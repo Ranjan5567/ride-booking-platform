@@ -1,4 +1,0 @@
-project_name  = "ride-booking"
-azure_location = "eastus"
-environment    = "dev"
-

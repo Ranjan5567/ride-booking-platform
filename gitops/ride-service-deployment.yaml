@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: ride-service
-        image: <REGISTRY>/ride-service:latest
+        image: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/ride-service:latest
         ports:
         - containerPort: 8003
         env:

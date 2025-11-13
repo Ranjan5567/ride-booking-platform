@@ -54,6 +54,7 @@ build/
 # Kubernetes
 kubeconfig
 *.kubeconfig
+kubectl.exe
 
 # Logs
 *.log

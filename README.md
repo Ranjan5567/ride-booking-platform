@@ -1,284 +1,353 @@
-# Ride Booking Platform - BITS Cloud Computing Project
+# 🚗 Ride Booking Platform - Multi-Cloud Microservices
 
-A complete multi-cloud ride booking platform demonstrating IaC, GitOps, microservices, serverless functions, stream analytics, and Kubernetes autoscaling.
+**A production-grade ride booking application deployed across AWS and GCP with real-time stream processing**
 
-## 🎯 Project Overview
-
-This project implements a simplified ride booking platform that satisfies all requirements for the BITS Cloud Computing course (CS/SS G527). The solution is multi-cloud (AWS + Azure), infrastructure-as-code based, GitOps-managed, and fully cloud-native.
-
-## 🏗️ Architecture
-
-### Cloud Distribution
-
-**AWS (Primary Cloud):**
-- EKS cluster hosting 4 microservices
-- RDS PostgreSQL for relational data
-- Lambda function for notifications
-- API Gateway for Lambda integration
-- S3 for object storage
-- Prometheus, Grafana, Loki for observability
-- ArgoCD for GitOps
-
-**Azure (Secondary Cloud):**
-- Event Hub (Kafka-compatible) for event streaming
-- HDInsight Flink for stream analytics
-- Cosmos DB for NoSQL analytics storage
-
-### Microservices
-
-1. **User Service** (FastAPI) - User registration, login, city management
-2. **Driver Service** (FastAPI) - Driver management, status updates
-3. **Ride Service** (FastAPI) - Main orchestration service, triggers payment, notification, and event publishing
-4. **Payment Service** (FastAPI) - Dummy payment processing (always returns SUCCESS)
-5. **Notification Service** (AWS Lambda) - HTTP-triggered via API Gateway
-6. **Analytics Service** (Azure Flink) - Stream processing from Event Hub to Cosmos DB
-
-## 📁 Project Structure
-
-```
-ride-booking-platform/
-├── infra/
-│   ├── aws/              # Terraform AWS infrastructure
-│   └── azure/            # Terraform Azure infrastructure
-├── backend/
-│   ├── user-service/
-│   ├── driver-service/
-│   ├── ride-service/
-│   ├── payment-service/
-│   └── notification-lambda/
-├── analytics/
-│   └── flink-job/        # Flink stream processing job
-├── gitops/
-│   └── argocd-apps.yaml  # ArgoCD application manifests
-├── monitoring/
-│   ├── prometheus/
-│   └── grafana/
-├── loadtest/
-│   └── ride_service_test.js
-├── frontend/
-│   └── nextjs-ui/        # Next.js frontend application
-└── docs/
-    ├── ARCHITECTURE.md
-    ├── REQUIREMENT_MAPPING.md
-    └── DEMO_SCRIPT.md
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- AWS CLI configured with appropriate credentials
-- Azure CLI configured with appropriate credentials
-- Terraform >= 1.0
-- kubectl
-- Docker
-- Node.js 18+ (for frontend)
-
-### 1. Deploy Infrastructure
-
-#### AWS Infrastructure
-
-```bash
-cd infra/aws
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
-terraform init
-terraform plan
-terraform apply
-```
-
-#### Azure Infrastructure
-
-```bash
-cd infra/azure
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
-terraform init
-terraform plan
-terraform apply
-```
-
-### 2. Configure Kubernetes
-
-```bash
-# Get kubeconfig from Terraform output
-aws eks update-kubeconfig --name ride-booking-eks --region us-east-1
-
-# Create secrets for database and Azure credentials
-kubectl create secret generic db-credentials \
-  --from-literal=host=<RDS_ENDPOINT> \
-  --from-literal=name=ridebooking \
-  --from-literal=user=admin \
-  --from-literal=password=<DB_PASSWORD>
-
-kubectl create secret generic azure-credentials \
-  --from-literal=eventhub_connection_string=<EVENTHUB_CONNECTION_STRING>
-
-kubectl create configmap app-config \
-  --from-literal=lambda_api_url=<API_GATEWAY_URL>
-```
-
-### 3. Build and Push Docker Images
-
-```bash
-# Build images for each service
-cd backend/user-service
-docker build -t user-service:latest .
-# Tag and push to your container registry
-docker tag user-service:latest <REGISTRY>/user-service:latest
-docker push <REGISTRY>/user-service:latest
-
-# Repeat for driver-service, ride-service, payment-service
-```
-
-### 4. Deploy ArgoCD
-
-```bash
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-
-# Wait for ArgoCD to be ready
-kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
-
-# Get ArgoCD admin password
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-```
-
-### 5. Configure ArgoCD Applications
-
-Update `gitops/argocd-apps.yaml` with your Git repository URL, then apply:
-
-```bash
-kubectl apply -f gitops/argocd-apps.yaml
-```
-
-### 6. Deploy Monitoring Stack
-
-```bash
-# Install Prometheus
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring --create-namespace
-
-# Install Loki
-helm repo add grafana https://grafana.github.io/helm-charts
-helm install loki grafana/loki-stack -n monitoring
-```
-
-### 7. Deploy Frontend
-
-```bash
-cd frontend/nextjs-ui
-npm install
-npm run build
-# Deploy to your hosting platform or run locally
-npm start
-```
-
-### 8. Deploy Flink Job
-
-```bash
-cd analytics/flink-job
-# Build the Flink job
-mvn clean package
-
-# Upload to HDInsight cluster and submit job
-# Follow Azure HDInsight documentation for job submission
-```
-
-## 🧪 Load Testing
-
-Run k6 load test to demonstrate HPA scaling:
-
-```bash
-# Set environment variable to disable notifications during load test
-export DISABLE_NOTIFICATIONS=true
-
-# Run load test
-k6 run loadtest/ride_service_test.js
-```
-
-Monitor HPA scaling in Grafana dashboard.
-
-## 📊 Observability
-
-Access Grafana:
-```bash
-kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
-# Open http://localhost:3000
-# Default credentials: admin/prom-operator
-```
-
-## 🔄 Flow Diagram
-
-```
-Frontend → Ride Service → RDS (Postgres)
-                ↓
-         Payment Service (SUCCESS)
-                ↓
-         Lambda (Notification)
-                ↓
-         Azure Event Hub
-                ↓
-         Flink (HDInsight)
-                ↓
-         Cosmos DB
-                ↓
-         Analytics Dashboard
-```
-
-## ✅ Requirements Mapping
-
-| Requirement | Implementation |
-|------------|----------------|
-| IaC (Terraform) | ✅ Terraform modules for AWS & Azure |
-| 6 Microservices | ✅ 4 EKS services + 1 Lambda + 1 Flink |
-| Multi-cloud | ✅ AWS + Azure |
-| Serverless | ✅ AWS Lambda |
-| Stream Processing | ✅ Azure Flink (HDInsight) |
-| GitOps | ✅ ArgoCD |
-| HPA | ✅ Ride Service + User Service |
-| Observability | ✅ Prometheus + Grafana + Loki |
-| Distinct Storages | ✅ RDS (SQL), S3 (Object), Cosmos DB (NoSQL) |
-| Load Testing | ✅ k6 scripts |
-
-## 📝 Environment Variables
-
-### Backend Services
-- `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_PORT`
-- `PAYMENT_SERVICE_URL`
-- `LAMBDA_API_URL`
-- `EVENTHUB_CONNECTION_STRING`
-- `DISABLE_NOTIFICATIONS` (for load testing)
-
-### Frontend
-- `NEXT_PUBLIC_API_BASE_URL`
-
-## 🐛 Troubleshooting
-
-1. **Services not starting**: Check database connectivity and secrets
-2. **HPA not scaling**: Verify metrics server is installed
-3. **Event Hub connection issues**: Verify connection string format
-4. **ArgoCD sync issues**: Check Git repository access and credentials
-
-## 📚 Documentation
-
-- [Architecture Details](docs/ARCHITECTURE.md)
-- [Requirement Mapping](docs/REQUIREMENT_MAPPING.md)
-- [Demo Script](docs/DEMO_SCRIPT.md)
-
-## 🤝 Contributing
-
-This is an academic project. For improvements, please create issues or pull requests.
-
-## 📄 License
-
-This project is for educational purposes as part of BITS Cloud Computing course.
-
-## 👥 Authors
-
-BITS Cloud Computing Project Team
+[![Infrastructure](https://img.shields.io/badge/IaC-Terraform-7B42BC)](https://www.terraform.io/)
+[![Kubernetes](https://img.shields.io/badge/K8s-EKS-326CE5)](https://aws.amazon.com/eks/)
+[![Streaming](https://img.shields.io/badge/Streaming-Apache%20Flink-E6526F)](https://flink.apache.org/)
+[![Kafka](https://img.shields.io/badge/Kafka-Confluent%20Cloud-00D4FF)](https://confluent.cloud/)
 
 ---
 
-**Note**: This is a simplified scaffold for academic demonstration. Production deployments would require additional security, monitoring, and operational considerations.
+## 🎯 **Project Overview**
 
+A fully functional ride booking platform demonstrating:
+- ✅ **Multi-cloud architecture** (AWS + GCP)
+- ✅ **Microservices** (6 services across 2 clouds)
+- ✅ **Real-time streaming** (Apache Flink on Dataproc)
+- ✅ **GitOps deployment** (ArgoCD)
+- ✅ **Auto-scaling** (HPA on EKS)
+- ✅ **Observability** (Prometheus + Grafana + Loki)
+- ✅ **Load testing** (k6)
+
+**Built for:** BITS Pilani Cloud Computing Project (60 Marks)
+
+---
+
+## 🏗️ **Architecture**
+
+```
+┌──────────────┐
+│   Frontend   │ (Next.js)
+└──────┬───────┘
+       │
+   ┌───▼──────────────────────────────────┐
+   │      AWS (Provider A)                │
+   │  ┌─────────────────────────────────┐│
+   │  │  EKS Cluster (Kubernetes)        ││
+   │  │  • User Service                  ││
+   │  │  • Driver Service                ││
+   │  │  • Ride Service (HPA 2-8 pods)   ││
+   │  │  • Payment Service               ││
+   │  └─────────────────────────────────┘│
+   │  • RDS PostgreSQL                    │
+   │  • AWS Lambda (Notifications)        │
+   │  • S3 (Object Storage)               │
+   └─────────────┬────────────────────────┘
+                 │
+          ┌──────▼────────┐
+          │ Confluent     │
+          │ Cloud Kafka   │
+          │(Multi-Cloud)  │
+          └──────┬────────┘
+                 │
+   ┌─────────────▼────────────────────────┐
+   │      GCP (Provider B)                │
+   │  ┌─────────────────────────────────┐│
+   │  │ Dataproc Cluster (Flink)         ││
+   │  │ • Real-time aggregation          ││
+   │  │ • Time-windowed processing       ││
+   │  └─────────────────────────────────┘│
+   │  • Firestore (NoSQL Analytics)       │
+   │  • Cloud Storage (Staging)           │
+   └──────────────────────────────────────┘
+```
+
+---
+
+## 📁 **Project Structure**
+
+```
+.
+├── README.md                      # This file
+├── QUICKSTART.md                  # 30-minute deployment guide
+├── DEPLOYMENT.md                  # Comprehensive deployment instructions
+├── ARCHITECTURE_SUMMARY.md        # Architecture details & cost breakdown
+├── GCP_MIGRATION_SUMMARY.md       # GCP migration notes
+│
+├── backend/                       # Microservices (Python FastAPI)
+│   ├── user-service/              # User authentication & profiles
+│   ├── driver-service/            # Driver management
+│   ├── ride-service/              # Ride booking & matching
+│   └── payment-service/           # Payment processing
+│
+├── frontend/                      # Frontend application
+│   └── nextjs-ui/                 # Next.js web interface
+│
+├── infra/                         # Infrastructure as Code
+│   ├── aws/                       # AWS Terraform (Provider A)
+│   │   ├── main.tf                # EKS, RDS, Lambda, S3
+│   │   └── modules/               # Modular resources
+│   └── gcp/                       # GCP Terraform (Provider B)
+│       ├── main.tf                # Dataproc, Firestore
+│       └── modules/               # Dataproc & Firestore modules
+│
+├── gitops/                        # Kubernetes manifests
+│   ├── user-service-deployment.yaml
+│   ├── driver-service-deployment.yaml
+│   ├── ride-service-deployment.yaml
+│   ├── payment-service-deployment.yaml
+│   └── argocd-apps.yaml           # ArgoCD application definitions
+│
+├── analytics/                     # Stream processing
+│   └── flink-job/                 # Apache Flink job (Java)
+│
+├── monitoring/                    # Observability
+│   └── grafana/                   # Grafana dashboards
+│
+└── loadtest/                      # Load testing scripts (k6)
+```
+
+---
+
+## 🚀 **Quick Start (30 Minutes)**
+
+### **Prerequisites**
+- AWS Account + CLI configured
+- GCP Account + gcloud CLI configured
+- Confluent Cloud account (Free $400 credit)
+- Docker, Terraform, kubectl, Helm installed
+
+### **Deploy**
+
+1. **Setup Confluent Cloud** (5 min)
+   - Sign up at https://confluent.cloud
+   - Create Basic cluster in GCP us-central1
+   - Create topics: `rides`, `ride-results`
+   - Get API Key & Bootstrap servers
+
+2. **Deploy Infrastructure** (10 min)
+   ```bash
+   # AWS
+   cd infra/aws
+   cp terraform.tfvars.example terraform.tfvars
+   # Edit terraform.tfvars
+   terraform init && terraform apply
+   
+   # GCP
+   cd ../gcp
+   cp terraform.tfvars.example terraform.tfvars
+   # Edit terraform.tfvars (add Confluent credentials)
+   terraform init && terraform apply
+   ```
+
+3. **Deploy Microservices** (10 min)
+   ```bash
+   # Build & push Docker images
+   # Configure kubectl
+   # Deploy via ArgoCD
+   ```
+
+4. **Deploy Flink Job** (5 min)
+   ```bash
+   cd analytics/flink-job
+   mvn clean package
+   gcloud dataproc jobs submit flink ...
+   ```
+
+**📖 See `QUICKSTART.md` for complete commands**
+
+---
+
+## 💰 **Cost Breakdown**
+
+**Total: ~$0.37/hour = $8.88/day**
+
+- **AWS:** $0.17/hour (EKS, RDS, Lambda, S3)
+- **GCP:** $0.16/hour (Dataproc, Firestore)
+- **Confluent:** $0.04/hour (~$1/day, Basic cluster)
+
+**Development Cost (60 hours):** ~$22-25  
+**Demo Cost (10 hours):** ~$4-5
+
+**💡 Tip:** Destroy infrastructure when not in use!
+
+---
+
+## ✅ **Project Requirements Met**
+
+| Requirement | Implementation | Status |
+|-------------|----------------|--------|
+| **6 Microservices** | user, driver, ride, payment, notification (Lambda), analytics (Flink) | ✅ |
+| **Multiple Clouds** | AWS (Provider A) + GCP (Provider B) | ✅ |
+| **IaC** | Terraform for all infrastructure | ✅ |
+| **Managed K8s** | AWS EKS | ✅ |
+| **HPA** | ride-service & user-service | ✅ |
+| **GitOps** | ArgoCD | ✅ |
+| **Flink on Managed Cluster** | Google Dataproc | ✅ |
+| **Managed Kafka** | Confluent Cloud | ✅ |
+| **SQL Database** | RDS PostgreSQL | ✅ |
+| **NoSQL Database** | Google Firestore | ✅ |
+| **Object Storage** | S3 + Cloud Storage | ✅ |
+| **Serverless** | AWS Lambda | ✅ |
+| **Observability** | Prometheus + Grafana + Loki | ✅ |
+| **Load Testing** | k6 | ✅ |
+
+---
+
+## 🛠️ **Technology Stack**
+
+### **Backend**
+- **Language:** Python 3.10+
+- **Framework:** FastAPI
+- **Database:** PostgreSQL (RDS)
+- **API:** REST
+
+### **Frontend**
+- **Framework:** Next.js 14
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
+
+### **Infrastructure**
+- **IaC:** Terraform
+- **Container Orchestration:** Kubernetes (EKS)
+- **CI/CD:** GitOps with ArgoCD
+- **Container Registry:** AWS ECR / Docker Hub
+
+### **Streaming**
+- **Platform:** Apache Flink 1.17
+- **Cluster:** Google Dataproc
+- **Message Broker:** Confluent Cloud Kafka
+- **Processing:** Time-windowed aggregation
+
+### **Monitoring**
+- **Metrics:** Prometheus + Grafana
+- **Logging:** Loki + Promtail
+- **Alerting:** Grafana Alertmanager
+
+---
+
+## 📊 **Key Features**
+
+### **1. Real-Time Stream Processing**
+- Flink consumes ride events from Kafka
+- Performs time-windowed aggregation (1-minute windows)
+- Calculates rides per city in real-time
+- Publishes results back to Kafka
+- Stores aggregated data in Firestore
+
+### **2. Auto-Scaling**
+- HPA scales ride-service from 2→8 pods
+- Based on CPU utilization (target: 70%)
+- Tested with k6 load testing tool
+
+### **3. Multi-Cloud Architecture**
+- AWS for core application services
+- GCP for analytics workload
+- Confluent Cloud for cross-cloud messaging
+
+### **4. GitOps Deployment**
+- All deployments via ArgoCD
+- Git as single source of truth
+- Automatic sync from repository
+
+### **5. Comprehensive Monitoring**
+- Prometheus scrapes metrics from all services
+- Grafana dashboards for visualization
+- Loki for centralized logging
+
+---
+
+## 📖 **Documentation**
+
+- **`README.md`** (this file) - Project overview
+- **`QUICKSTART.md`** - 30-minute deployment guide
+- **`DEPLOYMENT.md`** - Comprehensive step-by-step instructions
+- **`ARCHITECTURE_SUMMARY.md`** - Architecture details & diagrams
+- **`GCP_MIGRATION_SUMMARY.md`** - Provider B migration notes
+
+---
+
+## 🧪 **Testing**
+
+### **Manual Testing**
+```bash
+# Health check
+curl http://localhost:8003/health
+
+# Book a ride
+curl -X POST http://localhost:8003/ride/start -H "Content-Type: application/json" -d '{...}'
+```
+
+### **Load Testing**
+```bash
+cd loadtest
+k6 run ride_service_test.js
+```
+
+### **Verify HPA Scaling**
+```bash
+kubectl get hpa --watch
+kubectl get pods -l app=ride-service --watch
+```
+
+---
+
+## 🎓 **Learning Outcomes**
+
+By completing this project, you will learn:
+
+1. **Multi-Cloud Architecture** - Deploy across AWS & GCP
+2. **Microservices Design** - Build & deploy distributed systems
+3. **Stream Processing** - Real-time data processing with Flink
+4. **Infrastructure as Code** - Terraform for cloud resources
+5. **Kubernetes** - Container orchestration & auto-scaling
+6. **GitOps** - Modern deployment practices with ArgoCD
+7. **Observability** - Monitoring & logging best practices
+8. **Load Testing** - Performance testing & validation
+
+---
+
+## 🏆 **Project Highlights**
+
+- ✅ **Production-Grade:** Industry best practices
+- ✅ **Cost-Optimized:** ~$25 total for development
+- ✅ **Well-Documented:** Comprehensive guides
+- ✅ **Fully Automated:** IaC + GitOps
+- ✅ **Scalable:** HPA + Kafka + Flink
+- ✅ **Observable:** Full monitoring stack
+
+---
+
+## 🛑 **Cleanup**
+
+**⚠️ Important:** Destroy resources when not in use to avoid charges
+
+```bash
+# Destroy GCP
+cd infra/gcp && terraform destroy
+
+# Destroy AWS
+cd infra/aws && terraform destroy
+
+# Delete Confluent Cloud cluster from https://confluent.cloud
+```
+
+---
+
+## 📞 **Support**
+
+- **Quick Start:** See `QUICKSTART.md`
+- **Detailed Guide:** See `DEPLOYMENT.md`
+- **Troubleshooting:** See `DEPLOYMENT.md` → Troubleshooting section
+
+---
+
+## 📝 **License**
+
+This project is for educational purposes as part of BITS Pilani Cloud Computing coursework.
+
+---
+
+**Built with ❤️ for Cloud Computing Project**  
+**BITS Pilani | 2024**

@@ -63,7 +63,7 @@ fi
 echo -e "${BLUE}Configuring Kubernetes...${NC}"
 cd ../..
 EKS_CLUSTER_NAME=$(terraform -chdir=infra/aws output -raw eks_cluster_id 2>/dev/null || echo "ride-booking-eks")
-AWS_REGION=$(terraform -chdir=infra/aws output -raw aws_region 2>/dev/null || echo "us-east-1")
+AWS_REGION=$(terraform -chdir=infra/aws output -raw aws_region 2>/dev/null || echo "ap-south-1")
 
 aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
 echo -e "${GREEN}✓ Kubernetes configured${NC}"

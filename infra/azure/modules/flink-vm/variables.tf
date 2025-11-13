@@ -1,13 +1,16 @@
 variable "project_name" {
-  description = "Project name prefix"
+  description = "Project name for resource naming"
   type        = string
-  default     = "ride-booking"
 }
 
-variable "azure_location" {
+variable "resource_group_name" {
+  description = "Name of the resource group"
+  type        = string
+}
+
+variable "location" {
   description = "Azure region"
   type        = string
-  default     = "eastus"
 }
 
 variable "environment" {
