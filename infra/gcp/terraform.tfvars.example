@@ -1,0 +1,12 @@
+# GCP Configuration
+gcp_project_id = "your-gcp-project-id"
+gcp_region     = "us-central1"
+project_name   = "ride-booking"
+environment    = "dev"
+
+# Confluent Cloud Kafka Configuration
+# Sign up at: https://confluent.cloud (Free tier available: $400 credit)
+confluent_kafka_bootstrap = "pkc-xxxxx.us-central1.gcp.confluent.cloud:9092"
+confluent_kafka_api_key    = "YOUR_CONFLUENT_API_KEY"
+confluent_kafka_api_secret = "YOUR_CONFLUENT_API_SECRET"
+
