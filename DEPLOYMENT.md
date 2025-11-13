@@ -24,7 +24,7 @@ Complete step-by-step guide to deploy the multi-cloud ride booking platform for 
 
 ⚠️ **Terraform alone will NOT complete the deployment.** 
 
-`terraform apply` only provisions the infrastructure (VPC, EKS, RDS, Lambda, Event Hub, HDInsight, Cosmos DB, etc.). 
+`terraform apply` only provisions the infrastructure (VPC, EKS, RDS, Lambda, S3, Event Hubs (Kafka), Flink Container, Table Storage, etc.). 
 
 You must also:
 - Build and push Docker images
@@ -73,7 +73,7 @@ aws configure
 # Enter:
 # - AWS Access Key ID
 # - AWS Secret Access Key
-# - Default region name: us-east-1
+# - Default region name: ap-south-1
 # - Default output format: json
 ```
 
@@ -92,13 +92,13 @@ Choose one of the following options:
 
 ```bash
 # Create repositories for each service
-aws ecr create-repository --repository-name user-service --region us-east-1
-aws ecr create-repository --repository-name driver-service --region us-east-1
-aws ecr create-repository --repository-name ride-service --region us-east-1
-aws ecr create-repository --repository-name payment-service --region us-east-1
+aws ecr create-repository --repository-name user-service --region ap-south-1
+aws ecr create-repository --repository-name driver-service --region ap-south-1
+aws ecr create-repository --repository-name ride-service --region ap-south-1
+aws ecr create-repository --repository-name payment-service --region ap-south-1
 
 # Get ECR login command
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
+aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 943812325535.dkr.ecr.ap-south-1.amazonaws.com
 ```
 
 #### Option B: Docker Hub (Simpler alternative)
@@ -109,7 +109,6 @@ docker login
 ```
 
 ---
-
 ## Phase 2: Infrastructure Deployment
 
 ### 2.1 Deploy AWS Infrastructure
@@ -124,10 +123,10 @@ cp terraform.tfvars.example terraform.tfvars
 **Edit `terraform.tfvars`:**
 
 ```hcl
-aws_region         = "us-east-1"
+aws_region         = "ap-south-1"
 project_name       = "ride-booking"
 vpc_cidr           = "10.0.0.0/16"
-availability_zones = ["us-east-1a", "us-east-1b"]
+availability_zones = ["ap-south-1a", "ap-south-1b"]
 db_name            = "ridebooking"
 db_username        = "admin"
 db_password        = "YourSecurePassword123!"  # ⚠️ CHANGE THIS TO A STRONG PASSWORD
@@ -166,19 +165,17 @@ terraform output
 
 ### 2.2 Deploy Azure Infrastructure
 
+**Student-Friendly Services:** Event Hub (Kafka-compatible), Table Storage (NoSQL), Flink Container Instance
+
 ```bash
 cd ../azure
 
-# Copy example variables file
-cp terraform.tfvars.example terraform.tfvars
-```
-
-**Edit `terraform.tfvars`:**
-
-```hcl
-azure_location = "eastus"
+# Create terraform.tfvars
+cat > terraform.tfvars << 'EOF'
 project_name   = "ride-booking"
+azure_location = "eastus"
 environment    = "dev"
+EOF
 ```
 
 **Deploy Azure Infrastructure:**
@@ -190,30 +187,32 @@ terraform init
 # Preview changes
 terraform plan
 
-# Apply changes (this takes 20-30 minutes)
+# Apply changes (this takes 5-10 minutes - much faster than HDInsight!)
 terraform apply
 # Type 'yes' when prompted
 
 # Save important outputs
-terraform output eventhub_connection_string > ../../outputs/eventhub_conn.txt
-terraform output cosmosdb_endpoint > ../../outputs/cosmos_endpoint.txt
-terraform output hdinsight_cluster_name > ../../outputs/hdinsight_cluster.txt
+terraform output kafka_bootstrap_servers > ../../outputs/kafka_bootstrap.txt
+terraform output eventhub_connection_string > ../../outputs/eventhub_connection.txt
+terraform output tablestorage_endpoint > ../../outputs/tablestorage_endpoint.txt
+terraform output flink_ui_url > ../../outputs/flink_ui.txt
 
 # Display all outputs
 terraform output
 ```
 
 **✅ Expected Outputs:**
-- Event Hub namespace and connection string
-- Cosmos DB endpoint
-- HDInsight cluster name
-- Resource group name
+- Event Hub namespace (Kafka-compatible)
+- Event Hub connection string
+- Kafka bootstrap servers (Event Hub endpoint)
+- Table Storage account name and endpoint
+- Flink Container UI URL and IP
 
 ### 2.3 Configure kubectl for EKS
 
 ```bash
 # Get EKS cluster credentials
-aws eks update-kubeconfig --name ride-booking-eks --region us-east-1
+aws eks update-kubeconfig --name ride-booking-eks --region ap-south-1
 
 # Verify connection
 kubectl get nodes
@@ -232,11 +231,12 @@ kubectl cluster-info
 ### 3.1 Set Your Registry URL
 
 ```bash
-# For AWS ECR (replace <ACCOUNT_ID> with your AWS account ID)
-export REGISTRY="<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com"
+# For AWS ECR
+export REGISTRY="943812325535.dkr.ecr.ap-south-1.amazonaws.com"
 
 # For Docker Hub (replace with your username)
 export REGISTRY="<your-dockerhub-username>"
+# windows $env:REGISTRY="943812325535.dkr.ecr.ap-south-1.amazonaws.com"
 
 # Verify
 echo $REGISTRY
@@ -251,25 +251,33 @@ cd ../../backend
 # User Service
 cd user-service
 docker build -t ${REGISTRY}/user-service:latest .
+#  windows -> docker build -t "$env:REGISTRY/user-service:latest" .
 docker push ${REGISTRY}/user-service:latest
+# docker push "$env:REGISTRY/user-service:latest"
 cd ..
 
 # Driver Service
 cd driver-service
 docker build -t ${REGISTRY}/driver-service:latest .
+# docker build -t "$env:REGISTRY/driver-service:latest" .
 docker push ${REGISTRY}/driver-service:latest
+# docker push "$env:REGISTRY/driver-service:latest"
 cd ..
 
 # Ride Service
 cd ride-service
 docker build -t ${REGISTRY}/ride-service:latest .
+# docker build -t "$env:REGISTRY/ride-service:latest" .
 docker push ${REGISTRY}/ride-service:latest
+# docker push "$env:REGISTRY/ride-service:latest"
 cd ..
 
 # Payment Service
 cd payment-service
 docker build -t ${REGISTRY}/payment-service:latest .
+# docker build -t "$env:REGISTRY/payment-service:latest" .
 docker push ${REGISTRY}/payment-service:latest
+# docker push "$env:REGISTRY/payment-service:latest"
 cd ..
 ```
 
@@ -293,7 +301,7 @@ image: user-service:latest
 
 # TO:
 image: <REGISTRY>/user-service:latest
-# Example: 123456789012.dkr.ecr.us-east-1.amazonaws.com/user-service:latest
+# Example: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/user-service:latest
 ```
 
 **Quick sed command (Linux/Mac/Git Bash):**
@@ -302,7 +310,7 @@ image: <REGISTRY>/user-service:latest
 cd ../gitops
 
 # Replace with your registry URL
-export REGISTRY="123456789012.dkr.ecr.us-east-1.amazonaws.com"
+export REGISTRY="943812325535.dkr.ecr.ap-south-1.amazonaws.com"
 
 sed -i "s|image: user-service:latest|image: ${REGISTRY}/user-service:latest|g" user-service-deployment.yaml
 sed -i "s|image: driver-service:latest|image: ${REGISTRY}/driver-service:latest|g" driver-service-deployment.yaml
@@ -317,6 +325,9 @@ sed -i "s|image: payment-service:latest|image: ${REGISTRY}/payment-service:lates
 ### 4.1 Create Database Credentials Secret
 
 ```bash
+
+aws eks update-kubeconfig --name ride-booking-eks --region ap-south-1
+
 # Get RDS endpoint from Terraform output (remove port number)
 cd ../infra/aws
 RDS_ENDPOINT=$(terraform output -raw rds_endpoint | cut -d':' -f1)
@@ -326,23 +337,25 @@ echo "RDS Endpoint: $RDS_ENDPOINT"
 kubectl create secret generic db-credentials \
   --from-literal=host=${RDS_ENDPOINT} \
   --from-literal=name=ridebooking \
-  --from-literal=user=admin \
-  --from-literal=password=YourSecurePassword123!
+  --from-literal=user=postgres \
+  --from-literal=password=RideDB_2025!
 
 # Verify
 kubectl get secret db-credentials
 ```
 
-### 4.2 Create Azure Credentials Secret
+### 4.2 Create Azure Kafka Credentials Secret
 
 ```bash
-# Get Event Hub connection string from Terraform output
+# Get Kafka bootstrap servers from Terraform output
 cd ../azure
-EVENTHUB_CONN=$(terraform output -raw eventhub_connection_string)
+KAFKA_BOOTSTRAP=$(terraform output -raw kafka_bootstrap_servers)
+COSMOSDB_KEY=$(terraform output -raw cosmosdb_primary_key)
 
-# Create secret
+# Create secret for Kafka and Cosmos DB
 kubectl create secret generic azure-credentials \
-  --from-literal=eventhub_connection_string="${EVENTHUB_CONN}"
+  --from-literal=kafka_bootstrap_servers="${KAFKA_BOOTSTRAP}" \
+  --from-literal=cosmosdb_primary_key="${COSMOSDB_KEY}"
 
 # Verify
 kubectl get secret azure-credentials
@@ -547,7 +560,9 @@ kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 
 ---
 
-## Phase 7: Deploy Flink Job
+## Phase 7: Deploy Flink Job on Container Instance
+
+**Note:** Using Azure Container Instance for Flink provides a cost-effective, student-friendly alternative to HDInsight while still running real Apache Flink.
 
 ### 7.1 Build Flink Job
 
@@ -566,49 +581,136 @@ ls -lh target/ride-analytics-1.0.0.jar
 
 **✅ Expected:** JAR file created at `target/ride-analytics-1.0.0.jar`
 
-### 7.2 Get HDInsight Cluster Details
+### 7.2 Get Flink Container Details
 
 ```bash
 cd ../../infra/azure
 
-# Get cluster name
-CLUSTER_NAME=$(terraform output -raw hdinsight_cluster_name)
-echo "HDInsight Cluster: $CLUSTER_NAME"
+# Get Flink UI URL
+FLINK_UI=$(terraform output -raw flink_ui_url)
+echo "Flink Web UI: $FLINK_UI"
 
-# Get cluster endpoint
-echo "Access HDInsight at: https://${CLUSTER_NAME}.azurehdinsight.net"
+# Get Event Hub (Kafka) details
+KAFKA_BOOTSTRAP=$(terraform output -raw kafka_bootstrap_servers)
+EVENTHUB_NAMESPACE=$(terraform output -raw eventhub_namespace)
+echo "Kafka Bootstrap Servers: $KAFKA_BOOTSTRAP"
+echo "Event Hub Namespace: $EVENTHUB_NAMESPACE"
 ```
 
-### 7.3 Upload and Submit Flink Job
+### 7.3 Verify Event Hub Topics
 
-#### Via Azure Portal (Easier):
+Event Hub topics (rides, ride-results) are automatically created by Terraform. Verify them:
 
-1. Open Azure Portal: https://portal.azure.com
-2. Navigate to your HDInsight cluster
-3. Go to "Cluster dashboards" → "Apache Ambari home"
-4. Login with credentials from Terraform (default: admin/P@ssw0rd123!)
-5. Go to Flink → "Submit Job"
-6. Upload `target/ride-analytics-1.0.0.jar`
-7. Set environment variables:
-   - `EVENTHUB_NAMESPACE`: Your Event Hub namespace
-   - `EVENTHUB_CONNECTION_STRING`: Your connection string
-8. Submit job
+**Via Azure CLI:**
+```bash
+# Get Event Hub namespace
+EVENTHUB_NAMESPACE=$(terraform output -raw eventhub_namespace)
 
-#### Via Azure CLI:
+# List Event Hubs (topics)
+az eventhubs eventhub list \
+  --resource-group cloudProject \
+  --namespace-name $EVENTHUB_NAMESPACE \
+  --output table
+
+# Expected output: rides, ride-results
+```
+
+**Via Azure Portal:**
+1. Open https://portal.azure.com
+2. Navigate to your Event Hub namespace (`ride-booking-eventhub-ns`)
+3. Click "Event Hubs" to see `rides` and `ride-results`
+
+**✅ Expected:** Event Hubs `rides` and `ride-results` exist
+
+### 7.4 Access Flink Web UI
+
+The Flink container is already running with JobManager and TaskManager:
 
 ```bash
-# Upload JAR to cluster storage
-az storage blob upload \
-  --account-name <storage-account-name> \
-  --container-name hdinsight \
-  --name flink-jobs/ride-analytics-1.0.0.jar \
-  --file ../../analytics/flink-job/target/ride-analytics-1.0.0.jar
+# Get Flink UI URL
+FLINK_UI=$(terraform output -raw flink_ui_url)
+echo "Open Flink UI: $FLINK_UI"
 
-# Submit via SSH (requires setting up SSH keys)
-# See Azure HDInsight documentation for SSH setup
+# Check Flink is running
+curl $FLINK_UI/overview
+
+# Open in browser
+# macOS/Linux: open $FLINK_UI
+# Windows: start $FLINK_UI
 ```
 
-**✅ Expected:** Flink job running and consuming from Event Hub
+**✅ Expected:** Flink dashboard showing JobManager and TaskManager running
+
+### 7.5 Submit Flink Job to Container
+
+Submit the Flink job using the REST API:
+
+```bash
+# Get Flink container IP
+FLINK_IP=$(terraform output -raw flink_ip)
+
+# Upload and submit JAR via REST API
+curl -X POST \
+  -H "Expect:" \
+  -F "jarfile=@analytics/flink-job/target/ride-analytics-1.0.0.jar" \
+  http://$FLINK_IP:8081/jars/upload
+
+# Get JAR ID from response (e.g., "flink-web-upload/xxxx_ride-analytics-1.0.0.jar")
+# Then run the job:
+JAR_ID="flink-web-upload/xxxx_ride-analytics-1.0.0.jar"  # Replace with actual ID
+
+curl -X POST \
+  http://$FLINK_IP:8081/jars/$JAR_ID/run
+```
+
+**Alternative: Using Flink CLI via Container Exec**
+
+```bash
+# Get container ID
+CONTAINER_ID=$(az container show \
+  --resource-group cloudProject \
+  --name ride-booking-flink \
+  --query "containers[0].name" -o tsv)
+
+# Copy JAR to container
+az container exec \
+  --resource-group cloudProject \
+  --name ride-booking-flink \
+  --container-name flink-jobmanager \
+  --exec-command "/bin/bash -c 'cat > /tmp/ride-analytics.jar'" \
+  < analytics/flink-job/target/ride-analytics-1.0.0.jar
+
+# Submit job
+az container exec \
+  --resource-group cloudProject \
+  --name ride-booking-flink \
+  --container-name flink-jobmanager \
+  --exec-command "flink run /tmp/ride-analytics.jar"
+```
+
+### 7.6 Monitor Flink Job
+
+```bash
+# Get Flink UI URL
+FLINK_UI=$(terraform output -raw flink_ui_url)
+
+# Open Flink UI in browser
+open $FLINK_UI
+
+# Check running jobs via API
+curl $FLINK_UI/jobs
+
+# Check job status
+curl $FLINK_UI/jobs/<job-id>
+
+# View job logs
+az container logs \
+  --resource-group cloudProject \
+  --name ride-booking-flink \
+  --container-name flink-jobmanager
+```
+
+**✅ Expected:** Flink job running in container, consuming from Event Hub `rides` topic, publishing to `ride-results` topic
 
 ---
 
@@ -748,26 +850,81 @@ aws lambda invoke \
 cat response.json
 ```
 
-### 9.4 Check Azure Event Hub
+### 9.4 Check Azure Event Hub (Kafka)
 
 ```bash
+# Get Event Hub namespace
+EVENTHUB_NAMESPACE=$(cd infra/azure && terraform output -raw eventhub_namespace)
+
+# Check Event Hub namespace status
+az eventhubs namespace show \
+  --resource-group cloudProject \
+  --name $EVENTHUB_NAMESPACE \
+  --output table
+
+# List Event Hubs (Kafka topics)
+az eventhubs eventhub list \
+  --resource-group cloudProject \
+  --namespace-name $EVENTHUB_NAMESPACE \
+  --output table
+
+# Check specific Event Hub (topic)
 az eventhubs eventhub show \
-  --resource-group ride-booking-rg \
-  --namespace-name ride-booking-eh-namespace \
+  --resource-group cloudProject \
+  --namespace-name $EVENTHUB_NAMESPACE \
   --name rides \
   --output table
 ```
 
-### 9.5 Check Cosmos DB
+### 9.5 Check Table Storage (NoSQL)
 
 ```bash
-# List databases
-az cosmosdb sql database list \
-  --account-name ride-booking-cosmosdb \
-  --resource-group ride-booking-rg
+# Get Table Storage account name
+STORAGE_ACCOUNT=$(cd infra/azure && terraform output -raw tablestorage_account_name)
 
-# Or check via Azure Portal
-echo "Check Cosmos DB at: https://portal.azure.com"
+# Check storage account status
+az storage account show \
+  --resource-group cloudProject \
+  --name $STORAGE_ACCOUNT \
+  --output table
+
+# List tables
+az storage table list \
+  --account-name $STORAGE_ACCOUNT \
+  --output table
+
+# Check table exists
+az storage table show \
+  --account-name $STORAGE_ACCOUNT \
+  --name rideanalytics
+
+# Or check via Azure Portal Storage Explorer
+echo "Check Table Storage at: https://portal.azure.com"
+```
+
+### 9.6 Check Flink Container
+
+```bash
+# Check container status
+az container show \
+  --resource-group cloudProject \
+  --name ride-booking-flink \
+  --output table
+
+# Check Flink Web UI
+FLINK_UI=$(cd infra/azure && terraform output -raw flink_ui_url)
+echo "Flink UI: $FLINK_UI"
+curl $FLINK_UI/overview
+
+# Check running jobs
+curl $FLINK_UI/jobs
+
+# View container logs
+az container logs \
+  --resource-group cloudProject \
+  --name ride-booking-flink \
+  --container-name flink-jobmanager \
+  --tail 50
 ```
 
 **✅ Expected:** All components running and healthy
@@ -876,8 +1033,8 @@ This test validates 5 components simultaneously:
 1. ✅ Ride Service (stores in RDS)
 2. ✅ Payment Service (processes payment)
 3. ✅ Lambda Function (sends notification)
-4. ✅ Event Hub (receives event)
-5. ✅ Flink Job (processes stream)
+4. ✅ Kafka (receives event)
+5. ✅ Flink Job (processes stream on YARN)
 
 ```bash
 kubectl port-forward svc/ride-service 8003:80
@@ -916,20 +1073,45 @@ aws logs tail /aws/lambda/ride-booking-notification-lambda --follow --since 5m
 ```
 **✅ Expected:** Log entry showing ride notification
 
-**C. Check Event Hub Metrics (Azure Portal):**
-1. Open Azure Portal
-2. Navigate to Event Hub namespace
-3. Go to "rides" topic → Metrics
-4. Check "Incoming Messages" graph
+**C. Check Kafka Metrics (Via SSH):**
+```bash
+# SSH to Kafka cluster
+ssh sshuser@<kafka-cluster>-ssh.azurehdinsight.net
 
-**✅ Expected:** Message count increased
+# Check messages in 'rides' topic
+/usr/hdp/current/kafka-broker/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic rides \
+  --from-beginning \
+  --max-messages 10
 
-**D. Check Flink Job Status (HDInsight):**
-1. Access HDInsight cluster dashboard
-2. Check Flink UI
+# Check consumer group lag
+/usr/hdp/current/kafka-broker/bin/kafka-consumer-groups.sh \
+  --bootstrap-server localhost:9092 \
+  --describe --group flink-consumer
+```
+
+**✅ Expected:** Messages appearing in Kafka topic
+
+**D. Check Flink Job Status (YARN on HDInsight Spark):**
+```bash
+# SSH to Spark cluster
+ssh sshuser@<spark-cluster>-ssh.azurehdinsight.net
+
+# List running Flink jobs
+cd ~/flink-1.17.1
+./bin/flink list -t yarn-per-job
+
+# Check YARN application status
+yarn application -list
+```
+
+**Via Web UI:**
+1. Open YARN ResourceManager: `https://<spark-cluster>.azurehdinsight.net/yarnui/`
+2. Click on your Flink application
 3. View job metrics and processing rate
 
-**✅ Expected:** Job processing events
+**✅ Expected:** Flink job running and processing events from Kafka
 
 **E. Check Cosmos DB (Azure Portal):**
 1. Open Cosmos DB account
@@ -1189,21 +1371,28 @@ kubectl top nodes
 kubectl top pods
 ```
 
-### Issue: Event Hub Connection Failed
+### Issue: Kafka Connection Failed
 
-**Symptom:** Ride service logs show Event Hub connection errors
+**Symptom:** Ride service or Flink job logs show Kafka connection errors
 
 **Solution:**
 
 ```bash
-# Verify connection string format
-kubectl get secret azure-credentials -o jsonpath='{.data.eventhub_connection_string}' | base64 -d
+# Verify Kafka bootstrap servers
+kubectl get secret azure-credentials -o jsonpath='{.data.kafka_bootstrap_servers}' | base64 -d
 echo ""
 
-# Connection string should start with: Endpoint=sb://...
+# SSH to Kafka cluster and check broker status
+ssh sshuser@ride-booking-kafka-ssh.azurehdinsight.net
 
-# Check network connectivity from EKS to Azure
-kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- curl -v https://<eventhub-namespace>.servicebus.windows.net
+# Test Kafka locally
+echo "test message" | /usr/hdp/current/kafka-broker/bin/kafka-console-producer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic rides
+
+# Verify topic exists
+/usr/hdp/current/kafka-broker/bin/kafka-topics.sh --list \
+  --bootstrap-server localhost:9092
 ```
 
 ### Issue: Lambda Not Triggering
@@ -1319,9 +1508,11 @@ Before recording your demo video, verify:
 - [ ] Grafana dashboard accessible and showing metrics
 - [ ] Prometheus collecting metrics from all services
 - [ ] Lambda function working and logging to CloudWatch
-- [ ] Event Hub receiving events from ride service
-- [ ] Flink job running on HDInsight
-- [ ] Cosmos DB storing analytics results
+- [ ] Kafka cluster running and topics created (`rides`, `ride-results`)
+- [ ] Kafka receiving events from ride service
+- [ ] Flink job running on YARN (HDInsight Spark cluster)
+- [ ] Flink consuming from Kafka and processing streams
+- [ ] Cosmos DB storing analytics results from Flink
 - [ ] Frontend accessible and all pages working
 - [ ] User registration and login working
 - [ ] Ride booking end-to-end flow working

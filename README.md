@@ -102,7 +102,7 @@ terraform apply
 
 ```bash
 # Get kubeconfig from Terraform output
-aws eks update-kubeconfig --name ride-booking-eks --region us-east-1
+aws eks update-kubeconfig --name ride-booking-eks --region ap-south-1
 
 # Create secrets for database and Azure credentials
 kubectl create secret generic db-credentials \

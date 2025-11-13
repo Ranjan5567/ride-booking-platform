@@ -8,10 +8,15 @@ output "eks_cluster_endpoint" {
   value       = module.eks.cluster_endpoint
 }
 
+output "kubeconfig" {
+  description = "Kubeconfig for EKS cluster"
+  value       = module.eks.kubeconfig
+  sensitive   = true
+}
+
 output "rds_endpoint" {
   description = "RDS Database Endpoint"
   value       = module.rds.db_endpoint
-  sensitive   = true
 }
 
 output "api_gateway_url" {
@@ -19,8 +24,12 @@ output "api_gateway_url" {
   value       = "${module.api_gateway.api_url}/notify"
 }
 
+output "lambda_function_name" {
+  description = "Lambda Function Name"
+  value       = module.lambda.function_name
+}
+
 output "s3_bucket_name" {
   description = "S3 Bucket Name"
   value       = module.s3.bucket_name
 }
-

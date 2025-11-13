@@ -74,33 +74,3 @@ resource "random_id" "bucket_suffix" {
   byte_length = 4
 }
 
-# Outputs
-output "eks_cluster_id" {
-  value = module.eks.cluster_id
-}
-
-output "eks_cluster_endpoint" {
-  value = module.eks.cluster_endpoint
-}
-
-output "kubeconfig" {
-  value     = module.eks.kubeconfig
-  sensitive = true
-}
-
-output "rds_endpoint" {
-  value = module.rds.db_endpoint
-}
-
-output "api_gateway_url" {
-  value = module.api_gateway.api_url
-}
-
-output "lambda_function_name" {
-  value = module.lambda.function_name
-}
-
-output "s3_bucket_name" {
-  value = module.s3.bucket_name
-}
-

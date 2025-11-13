@@ -10,72 +10,40 @@ terraform {
 
 provider "azurerm" {
   features {}
+  skip_provider_registration = true
 }
 
-# Resource Group
-resource "azurerm_resource_group" "main" {
-  name     = "${var.project_name}-rg"
-  location = var.azure_location
-
-  tags = {
-    Environment = var.environment
-    Project     = var.project_name
-  }
+# Use existing Resource Group (service principal has Contributor access)
+data "azurerm_resource_group" "main" {
+  name = "cloudProject"
 }
 
-# Event Hub Namespace
+# Event Hub - Kafka-compatible messaging (Student-friendly)
 module "eventhub" {
   source = "./modules/eventhub"
-  
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+
   project_name        = var.project_name
+  resource_group_name = data.azurerm_resource_group.main.name
+  location            = var.azure_location
+  environment         = var.environment
 }
 
-# Cosmos DB
-module "cosmosdb" {
-  source = "./modules/cosmosdb"
-  
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+# Table Storage - NoSQL for analytics (Student-friendly alternative to Cosmos DB)
+module "tablestorage" {
+  source = "./modules/tablestorage"
+
   project_name        = var.project_name
+  resource_group_name = data.azurerm_resource_group.main.name
+  location            = var.azure_location
+  environment         = var.environment
 }
 
-# HDInsight Flink Cluster
-module "hdinsight" {
-  source = "./modules/hdinsight"
-  
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+# Flink on Container Instance (Student-friendly alternative to HDInsight)
+module "flink" {
+  source = "./modules/flink-vm"
+
   project_name        = var.project_name
-  eventhub_namespace  = module.eventhub.namespace_name
-  eventhub_name       = module.eventhub.eventhub_name
-  cosmosdb_endpoint   = module.cosmosdb.endpoint
-  cosmosdb_key        = module.cosmosdb.primary_key
+  resource_group_name = data.azurerm_resource_group.main.name
+  location            = var.azure_location
+  environment         = var.environment
 }
-
-output "resource_group_name" {
-  value = azurerm_resource_group.main.name
-}
-
-output "eventhub_namespace" {
-  value = module.eventhub.namespace_name
-}
-
-output "eventhub_connection_string" {
-  value     = module.eventhub.connection_string
-  sensitive = true
-}
-
-output "cosmosdb_endpoint" {
-  value = module.cosmosdb.endpoint
-}
-
-output "cosmosdb_database_name" {
-  value = module.cosmosdb.database_name
-}
-
-output "hdinsight_cluster_name" {
-  value = module.hdinsight.cluster_name
-}
-
