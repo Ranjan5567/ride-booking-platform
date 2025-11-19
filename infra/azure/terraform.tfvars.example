@@ -1,0 +1,12 @@
+# Azure Service Principal Credentials
+azure_client_id       = "your-client-id"
+azure_client_secret   = "your-client-secret"
+azure_tenant_id       = "your-tenant-id"
+azure_subscription_id = "your-subscription-id"
+
+# Azure Configuration
+azure_location        = "southeastasia"
+project_name          = "ride-booking"
+resource_group_name   = "cloudProject"
+environment           = "dev"
+

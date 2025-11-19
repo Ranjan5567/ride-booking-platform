@@ -3,13 +3,19 @@ variable "project_id" {
   type        = string
 }
 
-variable "location" {
-  description = "Firestore location"
+variable "database_id" {
+  description = "Firestore database ID"
   type        = string
 }
 
-variable "database_id" {
-  description = "Firestore database ID"
+variable "location_id" {
+  description = "Firestore database location"
+  type        = string
+  default     = "us-central"
+}
+
+variable "project_name" {
+  description = "Project name prefix"
   type        = string
 }
 

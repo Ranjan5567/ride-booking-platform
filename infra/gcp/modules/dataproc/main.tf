@@ -1,25 +1,16 @@
-resource "google_dataproc_cluster" "flink" {
-  name   = var.cluster_name
-  region = var.region
+# Dataproc Cluster for Flink
+resource "google_dataproc_cluster" "flink_cluster" {
+  name     = var.cluster_name
+  project  = var.project_id
+  region   = var.region
 
   cluster_config {
-    staging_bucket = var.staging_bucket
-
-    # Enable Flink component
-    software_config {
-      image_version = "2.1-debian11"
-      optional_components = ["FLINK"]
-      
-      properties = {
-        "flink:taskmanager.numberOfTaskSlots" = "2"
-        "flink:parallelism.default"            = "2"
-      }
-    }
+    staging_bucket = google_storage_bucket.dataproc_staging.name
 
     # Master node configuration
     master_config {
       num_instances = 1
-      machine_type  = "n1-standard-2"
+      machine_type  = var.machine_type
       disk_config {
         boot_disk_type    = "pd-standard"
         boot_disk_size_gb = 50
@@ -28,68 +19,90 @@ resource "google_dataproc_cluster" "flink" {
 
     # Worker nodes configuration
     worker_config {
-      num_instances = 2
-      machine_type  = "n1-standard-2"
+      num_instances = var.num_workers
+      machine_type  = var.machine_type
       disk_config {
         boot_disk_type    = "pd-standard"
         boot_disk_size_gb = 50
       }
     }
 
-    # Network configuration
-    gce_cluster_config {
-      network    = var.network
-      subnetwork = var.subnetwork
-      tags       = ["dataproc-cluster"]
-
-      # Enable internal IP only for security (can be changed if needed)
-      internal_ip_only = false
+    # Software configuration
+    software_config {
+      image_version = "2.1-debian11"
+      override_properties = {
+        "dataproc:dataproc.allow.zero.workers" = "false"
+      }
     }
 
-    # Initialization script to configure Kafka credentials
+    # Initialization actions to install Flink
     initialization_action {
-      script      = google_storage_bucket_object.init_script.self_link
-      timeout_sec = 500
+      script      = google_storage_bucket_object.flink_init_script.url
+      timeout_sec = 600
+    }
+
+    # GCE cluster configuration
+    gce_cluster_config {
+      zone         = var.zone
+      network      = "default"
+      subnetwork   = null
+      tags         = ["dataproc", "flink"]
+      service_account = null
+      service_account_scopes = [
+        "https://www.googleapis.com/auth/cloud-platform"
+      ]
     }
   }
 
   labels = {
     environment = "dev"
-    purpose     = "flink-streaming"
+    purpose     = "flink-stream-processing"
+    project     = var.project_name
   }
 }
 
-# Upload initialization script to configure Kafka
-resource "google_storage_bucket_object" "init_script" {
-  name   = "scripts/init-kafka-config.sh"
-  bucket = var.staging_bucket
-  content = templatefile("${path.module}/scripts/init-kafka-config.sh.tpl", {
-    kafka_bootstrap  = var.kafka_bootstrap
-    kafka_api_key    = var.kafka_api_key
-    kafka_api_secret = var.kafka_api_secret
+# Random ID for unique bucket names
+resource "random_id" "bucket_suffix" {
+  byte_length = 8
+}
+
+# Storage bucket for Dataproc staging
+resource "google_storage_bucket" "dataproc_staging" {
+  name          = "${var.project_id}-dataproc-staging-${random_id.bucket_suffix.hex}"
+  location      = var.region
+  force_destroy = true
+
+  uniform_bucket_level_access = true
+
+  labels = {
+    environment = "dev"
+    purpose     = "dataproc-staging"
+  }
+}
+
+# Storage bucket for Flink initialization script
+resource "google_storage_bucket" "flink_scripts" {
+  name          = "${var.project_id}-flink-scripts-${random_id.bucket_suffix.hex}"
+  location      = var.region
+  force_destroy = true
+
+  uniform_bucket_level_access = true
+
+  labels = {
+    environment = "dev"
+    purpose     = "flink-scripts"
+  }
+}
+
+# Flink initialization script
+resource "google_storage_bucket_object" "flink_init_script" {
+  name    = "init-flink.sh"
+  bucket  = google_storage_bucket.flink_scripts.name
+  content = templatefile("${path.module}/scripts/init-flink.sh.tpl", {
+    kafka_bootstrap_servers = var.kafka_bootstrap_servers
+    kafka_api_key           = var.kafka_api_key
+    kafka_api_secret        = var.kafka_api_secret
   })
-}
-
-# Get cluster details
-data "google_dataproc_cluster" "flink" {
-  name   = google_dataproc_cluster.flink.name
-  region = var.region
-
-  depends_on = [google_dataproc_cluster.flink]
-}
-
-output "cluster_name" {
-  value = google_dataproc_cluster.flink.name
-}
-
-output "master_ip" {
-  value = data.google_dataproc_cluster.flink.cluster_config[0].master_config[0].instance_names[0]
-}
-
-output "web_interfaces" {
-  value = {
-    flink_ui       = "http://${data.google_dataproc_cluster.flink.cluster_config[0].master_config[0].instance_names[0]}:8088"
-    resource_manager = "http://${data.google_dataproc_cluster.flink.cluster_config[0].master_config[0].instance_names[0]}:8088"
-  }
+  content_type = "text/x-shellscript"
 }
 

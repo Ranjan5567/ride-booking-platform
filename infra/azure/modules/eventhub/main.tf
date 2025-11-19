@@ -1,44 +1,55 @@
-# Azure Event Hubs - Kafka-compatible managed service
-# Student-friendly alternative to HDInsight Kafka
-
+# Event Hub Namespace (Kafka-compatible)
 resource "azurerm_eventhub_namespace" "main" {
   name                = "${var.project_name}-eventhub-ns"
   location            = var.location
   resource_group_name = var.resource_group_name
-  sku                 = "Standard"  # Standard tier supports Kafka protocol
+  sku                 = "Standard"  # Basic doesn't support Kafka
   capacity            = 1
 
   tags = {
-    Environment = var.environment
-    Purpose     = "Kafka-compatible-messaging"
+    Environment = "dev"
+    Purpose     = "Kafka-Compatible-Messaging"
   }
 }
 
-# Topic for ride events
+# Event Hub (Topic) for rides
 resource "azurerm_eventhub" "rides" {
   name                = "rides"
   namespace_name      = azurerm_eventhub_namespace.main.name
   resource_group_name = var.resource_group_name
-  partition_count     = 4
-  message_retention   = 1  # 1 day retention
+  partition_count     = 3
+  message_retention   = 1  # days
 }
 
-# Topic for processed ride analytics results
+# Event Hub (Topic) for ride results
 resource "azurerm_eventhub" "ride_results" {
   name                = "ride-results"
   namespace_name      = azurerm_eventhub_namespace.main.name
   resource_group_name = var.resource_group_name
-  partition_count     = 4
-  message_retention   = 1
+  partition_count     = 3
+  message_retention   = 1  # days
 }
 
-# Authorization rule for applications
-resource "azurerm_eventhub_namespace_authorization_rule" "app_access" {
-  name                = "app-access"
+# Authorization Rule for accessing Event Hub
+resource "azurerm_eventhub_namespace_authorization_rule" "main" {
+  name                = "RootManageSharedAccessKey"
   namespace_name      = azurerm_eventhub_namespace.main.name
   resource_group_name = var.resource_group_name
 
   listen = true
   send   = true
-  manage = false
+  manage = true
+}
+
+output "namespace_name" {
+  value = azurerm_eventhub_namespace.main.name
+}
+
+output "connection_string" {
+  value     = azurerm_eventhub_namespace_authorization_rule.main.primary_connection_string
+  sensitive = true
+}
+
+output "kafka_endpoint" {
+  value = "${azurerm_eventhub_namespace.main.name}.servicebus.windows.net:9093"
 }
