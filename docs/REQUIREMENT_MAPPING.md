@@ -16,21 +16,20 @@ This document maps each BITS Cloud Computing course requirement to the implement
   - S3 bucket
   - IAM roles and policies
   
-- ✅ **Azure Infrastructure** (`infra/azure/`)
-  - Resource Group
-  - Event Hub namespace and topic
-  - HDInsight Flink cluster
-  - Cosmos DB account and database
-  - Storage account for HDInsight
+- ✅ **GCP Infrastructure** (`infra/gcp/`)
+  - Dataproc cluster (Flink)
+  - Firestore database (NoSQL)
+  - Storage buckets for Dataproc
+  - Note: Confluent Cloud Kafka (external, configured via variables)
 
 **Files:**
 - `infra/aws/main.tf`, `infra/aws/modules/*/`
-- `infra/azure/main.tf`, `infra/azure/modules/*/`
+- `infra/gcp/main.tf`, `infra/gcp/modules/*/`
 
 **Verification:**
 ```bash
 cd infra/aws && terraform plan
-cd infra/azure && terraform plan
+cd infra/gcp && terraform plan
 ```
 
 ---
@@ -69,7 +68,7 @@ cd infra/azure && terraform plan
 
 6. ✅ **Analytics Service** (`analytics/flink-job/`)
    - Apache Flink job (Java/Python)
-   - Deployed on Azure HDInsight
+   - Deployed on Google Dataproc
    - Stream processing service
 
 **Files:**
@@ -98,25 +97,25 @@ aws lambda list-functions
   - S3 storage
   - Observability stack
 
-- ✅ **Azure (Secondary Cloud)**
-  - Event Hub (event streaming)
-  - HDInsight Flink (stream processing)
-  - Cosmos DB (analytics storage)
+- ✅ **GCP (Secondary Cloud)**
+  - Dataproc (Flink stream processing)
+  - Firestore (NoSQL analytics storage)
+  - Confluent Cloud (managed Kafka - external)
 
 **Cross-Cloud Communication:**
-- Ride Service (AWS) → Event Hub (Azure) via connection string
-- Flink (Azure) reads from Event Hub (Azure)
-- Flink (Azure) writes to Cosmos DB (Azure)
-- Frontend queries analytics from Cosmos DB
+- Ride Service (AWS) → Confluent Cloud Kafka via API keys
+- Flink (GCP Dataproc) reads from Confluent Cloud Kafka
+- Flink (GCP Dataproc) writes to Firestore (GCP)
+- Frontend queries analytics from Firestore
 
 **Files:**
 - `infra/aws/` - AWS infrastructure
-- `infra/azure/` - Azure infrastructure
-- `backend/ride-service/app.py` - Event Hub publishing
+- `infra/gcp/` - GCP infrastructure
+- `backend/ride-service/app.py` - Kafka publishing
 
 **Verification:**
 - Check Terraform outputs for both clouds
-- Verify Event Hub connection in Ride Service logs
+- Verify Kafka connection in Ride Service logs
 
 ---
 
@@ -149,19 +148,19 @@ aws lambda invoke --function-name ride-booking-notification-lambda response.json
 **Requirement:** Real-time stream processing must be implemented.
 
 **Implementation:**
-- ✅ **Azure HDInsight Flink**
-  - Consumes events from Event Hub
+- ✅ **Google Dataproc Flink**
+  - Consumes events from Confluent Cloud Kafka
   - Aggregates rides per city per minute
   - Tumbling window: 1 minute
-  - Writes results to Cosmos DB
+  - Writes results to Firestore
 
 **Processing Logic:**
-1. Read ride events from Event Hub topic "rides"
+1. Read ride events from Kafka topic "rides"
 2. Parse JSON and extract city
 3. Group by city
 4. Window by 1 minute
 5. Count rides per city
-6. Write to Cosmos DB collection "ride_analytics"
+6. Write to Firestore collection "ride_analytics"
 
 **Files:**
 - `analytics/flink-job/src/main/java/.../RideAnalyticsJob.java`
@@ -169,9 +168,9 @@ aws lambda invoke --function-name ride-booking-notification-lambda response.json
 - `analytics/flink-job/pom.xml`
 
 **Verification:**
-- Submit Flink job to HDInsight cluster
-- Monitor job status in Azure portal
-- Check Cosmos DB for aggregated results
+- Submit Flink job to Dataproc cluster
+- Monitor job status in GCP Console
+- Check Firestore for aggregated results
 
 ---
 
@@ -278,9 +277,9 @@ kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
   - Relational data with foreign keys
   - ACID transactions
 
-- ✅ **NoSQL Database (Cosmos DB)**
+- ✅ **NoSQL Database (Firestore)**
   - Stores: aggregated analytics data
-  - MongoDB API
+  - Native Firestore API
   - Document-based storage
 
 - ✅ **Object Storage (S3)**
@@ -290,7 +289,7 @@ kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 
 **Files:**
 - `infra/aws/modules/rds/main.tf`
-- `infra/azure/modules/cosmosdb/main.tf`
+- `infra/gcp/modules/firestore/main.tf`
 - `infra/aws/modules/s3/main.tf`
 
 **Verification:**
@@ -298,8 +297,8 @@ kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 # RDS
 aws rds describe-db-instances
 
-# Cosmos DB
-az cosmosdb show --name ride-booking-cosmosdb
+# Firestore
+gcloud firestore databases describe ride-booking-analytics
 
 # S3
 aws s3 ls
@@ -340,15 +339,15 @@ kubectl get pods -w
 
 | Requirement | Status | Implementation | Verification Method |
 |------------|--------|----------------|-------------------|
-| IaC (Terraform) | ✅ | AWS + Azure modules | `terraform plan` |
+| IaC (Terraform) | ✅ | AWS + GCP modules | `terraform plan` |
 | 6 Microservices | ✅ | 4 EKS + 1 Lambda + 1 Flink | `kubectl get deployments` |
-| Multi-cloud | ✅ | AWS + Azure | Terraform outputs |
+| Multi-cloud | ✅ | AWS + GCP | Terraform outputs |
 | Serverless | ✅ | AWS Lambda | `aws lambda list-functions` |
-| Stream Processing | ✅ | Azure Flink | HDInsight job status |
+| Stream Processing | ✅ | GCP Dataproc Flink | Dataproc job status |
 | GitOps | ✅ | ArgoCD | `argocd app list` |
 | HPA | ✅ | Ride + User Service | `kubectl get hpa` |
 | Observability | ✅ | Prometheus + Grafana + Loki | Grafana dashboards |
-| Distinct Storages | ✅ | RDS + Cosmos DB + S3 | Cloud console |
+| Distinct Storages | ✅ | RDS + Firestore + S3 | Cloud console |
 | Load Testing | ✅ | k6 scripts | `k6 run` + HPA observation |
 
 ---
@@ -367,7 +366,7 @@ kubectl get pods -w
 
 - [x] All infrastructure via Terraform
 - [x] 6 microservices implemented
-- [x] Multi-cloud (AWS + Azure)
+- [x] Multi-cloud (AWS + GCP)
 - [x] Serverless function (Lambda)
 - [x] Stream processing (Flink)
 - [x] GitOps (ArgoCD)
