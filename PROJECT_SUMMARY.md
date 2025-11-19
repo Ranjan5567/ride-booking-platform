@@ -39,7 +39,7 @@ All components of the Ride Booking Platform have been successfully created and o
 3. **Ride Service** (`backend/ride-service/`)
    - FastAPI application
    - Main orchestration service
-   - Integrates with Payment, Lambda, and Event Hub
+   - Integrates with Payment, Lambda, and Confluent Cloud Kafka
    - Dockerfile and requirements.txt included
 
 4. **Payment Service** (`backend/payment-service/`)
@@ -54,7 +54,7 @@ All components of the Ride Booking Platform have been successfully created and o
 
 6. **Analytics Service** (`analytics/flink-job/`)
    - Apache Flink job (Java and Python versions)
-   - Stream processing from Event Hub to Cosmos DB
+   - Stream processing from Confluent Cloud Kafka to Firestore
    - Maven POM file included
 
 ### Kubernetes Manifests
@@ -106,15 +106,15 @@ All components of the Ride Booking Platform have been successfully created and o
 
 | Requirement | Status | Location |
 |------------|--------|----------|
-| IaC (Terraform) | ✅ | `infra/aws/`, `infra/azure/` |
+| IaC (Terraform) | ✅ | `infra/aws/`, `infra/gcp/` |
 | 6 Microservices | ✅ | `backend/`, `infra/aws/modules/lambda/`, `analytics/` |
-| Multi-cloud | ✅ | AWS + Azure modules |
+| Multi-cloud | ✅ | AWS + GCP modules |
 | Serverless | ✅ | Lambda function |
 | Stream Processing | ✅ | Flink job |
 | GitOps | ✅ | ArgoCD manifests |
 | HPA | ✅ | Kubernetes HPA configs |
 | Observability | ✅ | Prometheus + Grafana + Loki |
-| Distinct Storages | ✅ | RDS + Cosmos DB + S3 |
+| Distinct Storages | ✅ | RDS + Firestore + S3 |
 | Load Testing | ✅ | k6 script |
 
 ## 📂 Complete Folder Structure
@@ -137,15 +137,14 @@ ride-booking-platform/
 │   │       ├── lambda/
 │   │       ├── api_gateway/
 │   │       └── s3/
-│   └── azure/
+│   └── gcp/
 │       ├── main.tf
 │       ├── variables.tf
 │       ├── outputs.tf
 │       ├── terraform.tfvars.example
 │       └── modules/
-│           ├── eventhub/
-│           ├── cosmosdb/
-│           └── hdinsight/
+│           ├── dataproc/
+│           └── firestore/
 ├── backend/
 │   ├── user-service/
 │   │   ├── app.py
@@ -210,12 +209,13 @@ ride-booking-platform/
 
 1. **Configure Terraform Variables**
    - Copy `terraform.tfvars.example` to `terraform.tfvars`
-   - Fill in your AWS and Azure credentials
+   - Fill in your AWS and GCP credentials
+   - Set up Confluent Cloud Kafka and get API keys
 
 2. **Deploy Infrastructure**
    ```bash
    cd infra/aws && terraform apply
-   cd ../azure && terraform apply
+   cd ../gcp && terraform apply
    ```
 
 3. **Build and Push Docker Images**
@@ -224,7 +224,7 @@ ride-booking-platform/
    - Update image references in Kubernetes manifests
 
 4. **Configure Secrets**
-   - Create Kubernetes secrets for database and Azure credentials
+   - Create Kubernetes secrets for database and GCP/Kafka credentials
    - Update ConfigMaps with service URLs
 
 5. **Deploy ArgoCD**
@@ -243,7 +243,7 @@ ride-booking-platform/
 
 8. **Deploy Flink Job**
    - Build Flink job: `mvn clean package`
-   - Submit to HDInsight cluster
+   - Upload to GCS and submit to Dataproc cluster
 
 9. **Test End-to-End**
    - Register user
@@ -264,7 +264,7 @@ ride-booking-platform/
 
 - ✅ Complete Terraform infrastructure
 - ✅ 6 microservices (4 EKS + 1 Lambda + 1 Flink)
-- ✅ Multi-cloud architecture (AWS + Azure)
+- ✅ Multi-cloud architecture (AWS + GCP)
 - ✅ GitOps with ArgoCD
 - ✅ Kubernetes autoscaling (HPA)
 - ✅ Comprehensive observability
