@@ -1,3 +1,8 @@
+variable "cluster_name" {
+  description = "Name of the Dataproc cluster"
+  type        = string
+}
+
 variable "project_id" {
   description = "GCP Project ID"
   type        = string
@@ -8,39 +13,43 @@ variable "region" {
   type        = string
 }
 
-variable "cluster_name" {
-  description = "Dataproc cluster name"
+variable "zone" {
+  description = "GCP Zone"
   type        = string
 }
 
-variable "network" {
-  description = "VPC network name"
+variable "machine_type" {
+  description = "Machine type for cluster nodes"
+  type        = string
+  default     = "n1-standard-2"
+}
+
+variable "num_workers" {
+  description = "Number of worker nodes"
+  type        = number
+  default     = 2
+}
+
+variable "project_name" {
+  description = "Project name prefix"
   type        = string
 }
 
-variable "subnetwork" {
-  description = "Subnetwork name"
+# Kafka Configuration
+variable "kafka_bootstrap_servers" {
+  description = "Kafka bootstrap servers (Confluent Cloud)"
   type        = string
-}
-
-variable "staging_bucket" {
-  description = "Cloud Storage bucket for staging"
-  type        = string
-}
-
-variable "kafka_bootstrap" {
-  description = "Kafka bootstrap servers"
-  type        = string
+  sensitive   = true
 }
 
 variable "kafka_api_key" {
-  description = "Kafka API Key"
+  description = "Kafka API Key (Confluent Cloud)"
   type        = string
   sensitive   = true
 }
 
 variable "kafka_api_secret" {
-  description = "Kafka API Secret"
+  description = "Kafka API Secret (Confluent Cloud)"
   type        = string
   sensitive   = true
 }

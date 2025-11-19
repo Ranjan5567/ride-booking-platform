@@ -1,12 +1,21 @@
 # GCP Configuration
-gcp_project_id = "your-gcp-project-id"
-gcp_region     = "us-central1"
-project_name   = "ride-booking"
-environment    = "dev"
+gcp_project_id = "careful-cosine-478715-a0"
+gcp_region     = "asia-south1"  # Mumbai, India
+gcp_zone       = "asia-south1-a"
+
+# Project Configuration
+project_name = "ride-booking"
+
+# Dataproc Configuration
+dataproc_machine_type = "n1-standard-2"
+dataproc_num_workers  = 2
+
+# Firestore Configuration
+firestore_location = "asia-south1"  # Mumbai, India
 
 # Confluent Cloud Kafka Configuration
-# Sign up at: https://confluent.cloud (Free tier available: $400 credit)
-confluent_kafka_bootstrap = "pkc-xxxxx.us-central1.gcp.confluent.cloud:9092"
-confluent_kafka_api_key    = "YOUR_CONFLUENT_API_KEY"
-confluent_kafka_api_secret = "YOUR_CONFLUENT_API_SECRET"
+# Get these from: https://confluent.cloud
+kafka_bootstrap_servers = "pkc-xxxxx.region.provider.confluent.cloud:9092"
+kafka_api_key           = "your-confluent-api-key"
+kafka_api_secret        = "your-confluent-api-secret"
 

@@ -6,35 +6,54 @@ variable "gcp_project_id" {
 variable "gcp_region" {
   description = "GCP Region"
   type        = string
-  default     = "us-central1"
+  default     = "asia-south1"  # Mumbai, India
+}
+
+variable "gcp_zone" {
+  description = "GCP Zone"
+  type        = string
+  default     = "asia-south1-a"
 }
 
 variable "project_name" {
-  description = "Project name for resource naming"
+  description = "Project name prefix"
   type        = string
   default     = "ride-booking"
 }
 
-variable "environment" {
-  description = "Environment (dev/staging/prod)"
+variable "dataproc_machine_type" {
+  description = "Machine type for Dataproc cluster nodes"
   type        = string
-  default     = "dev"
+  default     = "n1-standard-2"
 }
 
-# Confluent Cloud Kafka credentials
-variable "confluent_kafka_bootstrap" {
-  description = "Confluent Kafka bootstrap servers"
-  type        = string
+variable "dataproc_num_workers" {
+  description = "Number of worker nodes in Dataproc cluster"
+  type        = number
+  default     = 2
 }
 
-variable "confluent_kafka_api_key" {
-  description = "Confluent Kafka API Key"
+variable "firestore_location" {
+  description = "Firestore database location"
+  type        = string
+  default     = "asia-south1"  # Mumbai, India
+}
+
+# Confluent Cloud Kafka Configuration
+variable "kafka_bootstrap_servers" {
+  description = "Kafka bootstrap servers (Confluent Cloud)"
   type        = string
   sensitive   = true
 }
 
-variable "confluent_kafka_api_secret" {
-  description = "Confluent Kafka API Secret"
+variable "kafka_api_key" {
+  description = "Kafka API Key (Confluent Cloud)"
+  type        = string
+  sensitive   = true
+}
+
+variable "kafka_api_secret" {
+  description = "Kafka API Secret (Confluent Cloud)"
   type        = string
   sensitive   = true
 }

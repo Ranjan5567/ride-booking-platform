@@ -46,7 +46,7 @@ Verify all required tools are installed:
 # Check installations
 terraform --version   # >= 1.0
 aws --version        # AWS CLI v2
-az --version         # Azure CLI
+gcloud --version     # GCP CLI
 kubectl version      # Kubernetes CLI
 docker --version     # Docker
 helm version         # Helm v3
@@ -58,7 +58,7 @@ mvn --version        # Maven (for Flink job)
 **Installation Links:**
 - Terraform: https://www.terraform.io/downloads
 - AWS CLI: https://aws.amazon.com/cli/
-- Azure CLI: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
+- GCP CLI: https://cloud.google.com/sdk/docs/install
 - kubectl: https://kubernetes.io/docs/tasks/tools/
 - Docker: https://docs.docker.com/get-docker/
 - Helm: https://helm.sh/docs/intro/install/
@@ -83,13 +83,15 @@ gcloud auth login
 # Follow browser login flow
 
 # Set your project
-gcloud config set project YOUR_PROJECT_ID
+gcloud config set project careful-cosine-478715-a0
 
 # Enable required APIs
 gcloud services enable dataproc.googleapis.com
 gcloud services enable firestore.googleapis.com
 gcloud services enable compute.googleapis.com
 gcloud services enable storage.googleapis.com
+gcloud services enable storage-api.googleapis.com
+gcloud services enable storage-component.googleapis.com
 ```
 
 ### 1.3 Create Container Registry
@@ -171,28 +173,17 @@ terraform output
 - API Gateway URL
 - S3 bucket name
 
-### 2.2 Setup Confluent Cloud Kafka (Managed Multi-Cloud Kafka)
+### 2.2 Deploy GCP Infrastructure (Dataproc + Firestore + Confluent Cloud Kafka)
 
-Before deploying GCP infrastructure, set up Confluent Cloud (free tier available):
+GCP provides Dataproc (Flink cluster), Firestore (NoSQL), and Confluent Cloud (managed Kafka).
 
-**Sign up for Confluent Cloud:**
-1. Visit: https://confluent.cloud/signup
-2. Sign up (free $400 credit for students)
-3. Create a cluster:
-   - Choose **Basic** cluster (cheapest, ~$1/day)
-   - Select **GCP** as cloud provider
-   - Region: **us-central1**
-4. Create Kafka topics:
-   - `rides` (3 partitions)
-   - `ride-results` (3 partitions)
-5. Create API Key:
-   - Go to "API Keys" → "Add Key"
-   - Save the **API Key** and **API Secret**
-6. Get bootstrap servers:
-   - Go to "Cluster Settings"
-   - Copy **Bootstrap server** (looks like: `pkc-xxxxx.us-central1.gcp.confluent.cloud:9092`)
-
-### 2.3 Deploy GCP Infrastructure
+**Prerequisites:**
+1. **Confluent Cloud Setup** (Do this first):
+   - Sign up at https://confluent.cloud
+   - Create a Kafka cluster (Basic plan is sufficient)
+   - Create API keys (go to API Keys section)
+   - Create topics: `rides` and `ride-results`
+   - Save: Bootstrap servers, API key, and API secret
 
 ```bash
 cd infra/gcp
@@ -204,15 +195,25 @@ cp terraform.tfvars.example terraform.tfvars
 **Edit `terraform.tfvars`:**
 
 ```hcl
-gcp_project_id = "your-gcp-project-id"  # ⚠️ CHANGE THIS
-gcp_region     = "us-central1"
-project_name   = "ride-booking"
-environment    = "dev"
+# GCP Configuration
+gcp_project_id = "careful-cosine-478715-a0"
+gcp_region     = "asia-south1"  # Mumbai, India
+gcp_zone       = "asia-south1-a"
 
-# Confluent Cloud Kafka credentials (from previous step)
-confluent_kafka_bootstrap = "pkc-xxxxx.us-central1.gcp.confluent.cloud:9092"  # ⚠️ CHANGE THIS
-confluent_kafka_api_key    = "YOUR_CONFLUENT_API_KEY"     # ⚠️ CHANGE THIS
-confluent_kafka_api_secret = "YOUR_CONFLUENT_API_SECRET"  # ⚠️ CHANGE THIS
+# Project Configuration
+project_name = "ride-booking"
+
+# Dataproc Configuration
+dataproc_machine_type = "n1-standard-2"
+dataproc_num_workers  = 2
+
+# Firestore Configuration
+firestore_location = "asia-south1"  # Mumbai, India
+
+# Confluent Cloud Kafka Configuration (from https://confluent.cloud)
+kafka_bootstrap_servers = "pkc-xxxxx.region.provider.confluent.cloud:9092"  # ⚠️ CHANGE THIS
+kafka_api_key           = "your-confluent-api-key"                          # ⚠️ CHANGE THIS
+kafka_api_secret        = "your-confluent-api-secret"                      # ⚠️ CHANGE THIS
 ```
 
 **Deploy GCP Infrastructure:**
@@ -224,28 +225,27 @@ terraform init
 # Preview changes
 terraform plan
 
-# Apply changes (this takes 5-10 minutes)
+# Apply changes (⏱️ Takes ~10-15 minutes for Dataproc cluster)
 terraform apply
-# Type 'yes' when prompted
 
 # Save important outputs
 mkdir -p ../../outputs
 terraform output dataproc_cluster_name > ../../outputs/dataproc_cluster.txt
 terraform output firestore_database_id > ../../outputs/firestore_db.txt
-terraform output kafka_bootstrap_servers > ../../outputs/kafka_bootstrap.txt
 
 # Display all outputs
 terraform output
 ```
 
 **✅ Expected Outputs:**
-- Dataproc cluster name (for Flink)
-- Dataproc master IP and web interfaces
-- Firestore database ID
-- Kafka bootstrap servers (Confluent Cloud)
-- Staging bucket name
+- Dataproc cluster name: `ride-booking-flink-cluster`
+- Dataproc cluster endpoint
+- Firestore database ID: `ride-booking-analytics`
+- Firestore database location: `asia-south1`
 
-### 2.4 Configure kubectl for EKS
+**⏱️ Deployment Time:** ~10-15 minutes (Dataproc cluster provisioning)
+
+### 2.3 Configure kubectl for EKS
 
 ```bash
 # Get EKS cluster credentials
@@ -384,15 +384,15 @@ kubectl get secret db-credentials
 ### 4.2 Create GCP and Kafka Credentials Secret
 
 ```bash
-# Get Kafka bootstrap servers from Terraform output
 cd infra/gcp
-KAFKA_BOOTSTRAP=$(terraform output -raw kafka_bootstrap_servers)
 
-# Get Kafka credentials from terraform.tfvars (or use environment variables)
-KAFKA_API_KEY="your-confluent-api-key"
-KAFKA_API_SECRET="your-confluent-api-secret"
+# Get Kafka credentials from terraform.tfvars (you set these during Phase 2.2)
+# Or manually set them:
+KAFKA_BOOTSTRAP="pkc-xxxxx.region.provider.confluent.cloud:9092"  # From Confluent Cloud
+KAFKA_API_KEY="your-confluent-api-key"                          # From Confluent Cloud
+KAFKA_API_SECRET="your-confluent-api-secret"                    # From Confluent Cloud
 
-# Get Firestore database ID
+# Get Firestore database ID from Terraform output
 FIRESTORE_DB=$(terraform output -raw firestore_database_id)
 
 # Create secret for Kafka and Firestore
@@ -405,6 +405,10 @@ kubectl create secret generic gcp-credentials \
 # Verify
 kubectl get secret gcp-credentials
 ```
+
+**Note:** Kafka bootstrap servers and credentials come from Confluent Cloud (external service). Get them from:
+1. Confluent Cloud UI: https://confluent.cloud
+2. Your `terraform.tfvars` file (if you saved them there)
 
 ### 4.3 Create Application ConfigMap
 
@@ -607,7 +611,9 @@ kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 
 ## Phase 7: Deploy Flink Job on Google Dataproc
 
-**Note:** Google Dataproc provides native Flink support, making it easy to deploy and manage Flink jobs.
+**Note:** Google Dataproc provides a managed Hadoop/Spark cluster. Flink is automatically installed via initialization script during cluster creation.
+
+**📖 Detailed Guide:** See `infra/gcp/DEPLOYMENT_GUIDE.md` for comprehensive instructions.
 
 ### 7.1 Build Flink Job
 
@@ -621,58 +627,57 @@ mvn --version
 mvn clean package
 
 # Verify JAR created
-ls -lh target/ride-analytics-1.0.0.jar
+ls -lh target/ride-analytics-1.0.jar
 ```
 
-**✅ Expected:** JAR file created at `target/ride-analytics-1.0.0.jar`
+**✅ Expected:** JAR file created at `target/ride-analytics-1.0.jar`
 
 ### 7.2 Get Dataproc Cluster Details
 
 ```bash
 cd ../../infra/gcp
 
-# Get Dataproc cluster name
+# Get Dataproc cluster details
 CLUSTER_NAME=$(terraform output -raw dataproc_cluster_name)
-echo "Dataproc Cluster: $CLUSTER_NAME"
+REGION=$(terraform output -raw gcp_region)
+ZONE=$(terraform output -raw gcp_zone)
 
-# Get cluster region
-REGION="us-central1"
-
-# Get Kafka details
-KAFKA_BOOTSTRAP=$(terraform output -raw kafka_bootstrap_servers)
-echo "Kafka Bootstrap Servers: $KAFKA_BOOTSTRAP"
+echo "Cluster: $CLUSTER_NAME"
+echo "Region: $REGION"
+echo "Zone: $ZONE"
 ```
 
-### 7.3 Verify Kafka Topics in Confluent Cloud
+### 7.3 SSH to Dataproc Master Node
 
-Kafka topics should already exist in Confluent Cloud. Verify them:
+**SSH into Dataproc master node:**
 
-**Via Confluent Cloud UI:**
-1. Login to https://confluent.cloud
-2. Go to your cluster
-3. Click "Topics"
-4. Verify topics exist: `rides`, `ride-results`
-
-**Via Confluent CLI (Optional):**
 ```bash
-# Install Confluent CLI
-brew install confluentinc/tap/cli  # macOS
-# Or download from: https://docs.confluent.io/confluent-cli/current/install.html
-
-# Login
-confluent login
-
-# List topics
-confluent kafka topic list
-
-# Expected: rides, ride-results
+# From your local machine
+gcloud dataproc clusters ssh $CLUSTER_NAME \
+  --region=$REGION \
+  --zone=$ZONE
 ```
 
-**✅ Expected:** Kafka topics `rides` and `ride-results` exist in Confluent Cloud
+**✅ Expected:** Connected to Dataproc master node
 
-### 7.4 Access Dataproc Flink Web UI
+### 7.4 Start Flink Cluster
 
-Access Flink UI via Dataproc's web interfaces:
+**On the Dataproc master node:**
+
+```bash
+# Flink should already be installed at /opt/flink (via initialization script)
+# Start Flink cluster
+/opt/flink/bin/start-cluster.sh
+
+# Verify Flink is running
+/opt/flink/bin/flink list
+```
+
+**✅ Expected:** Flink cluster started successfully
+
+### 7.5 Access Flink Web UI
+
+**From your local machine, create SSH tunnel:**
 
 ```bash
 # Get master node name
@@ -680,111 +685,86 @@ MASTER_NODE=$(gcloud dataproc clusters describe $CLUSTER_NAME \
   --region=$REGION \
   --format="value(config.masterConfig.instanceNames[0])")
 
-echo "Master Node: $MASTER_NODE"
-
-# Create SSH tunnel to access Flink UI
+# Create SSH tunnel (keep this terminal open)
 gcloud compute ssh $MASTER_NODE \
-  --project=$(gcloud config get-value project) \
-  --zone=${REGION}-a \
-  -- -L 8088:localhost:8088 -N -f
+  --zone=$ZONE \
+  -- -L 8081:localhost:8081 -N
 
-# Open Flink UI
-echo "Flink UI available at: http://localhost:8088"
-# Open in browser: http://localhost:8088
+# Open in browser: http://localhost:8081
 ```
 
-**Alternative: Use Cloud Console**
-1. Go to Google Cloud Console
-2. Navigate to Dataproc → Clusters
-3. Click on your cluster name
-4. Go to "Web Interfaces" tab
-5. Click on "Flink History Server"
+**✅ Expected:** Flink web interface showing cluster dashboard
 
-**✅ Expected:** Flink web interface showing cluster status
+### 7.6 Upload and Submit Flink Job
 
-### 7.5 Submit Flink Job to Dataproc
-
-Upload and submit the Flink job to Dataproc:
+**From your local machine, upload the JAR to GCS:**
 
 ```bash
-# Get GCP project ID
-PROJECT_ID=$(gcloud config get-value project)
+# Create a bucket for your job (if not exists)
+gsutil mb -l $REGION gs://${CLUSTER_NAME}-flink-jobs || true
 
-# Get Dataproc cluster name
-CLUSTER_NAME=$(cd infra/gcp && terraform output -raw dataproc_cluster_name)
-
-# Upload Flink job JAR to Cloud Storage
-BUCKET_NAME="${PROJECT_ID}-dataproc-staging"
-gsutil cp analytics/flink-job/target/ride-analytics-1.0.0.jar \
-  gs://${BUCKET_NAME}/flink-jobs/
-
-# Submit Flink job to Dataproc
-gcloud dataproc jobs submit flink \
-  --cluster=$CLUSTER_NAME \
-  --region=$REGION \
-  --jar=gs://${BUCKET_NAME}/flink-jobs/ride-analytics-1.0.0.jar \
-  --properties="flink.parallelism.default=2"
+# Upload JAR to GCS
+gsutil cp ../../analytics/flink-job/target/ride-analytics-1.0.jar \
+  gs://${CLUSTER_NAME}-flink-jobs/
 ```
 
-**Alternative: Via SSH to master node**
+**SSH into Dataproc and submit the job:**
 
 ```bash
 # SSH to master node
-gcloud compute ssh $MASTER_NODE \
-  --project=$PROJECT_ID \
-  --zone=${REGION}-a
+gcloud dataproc clusters ssh $CLUSTER_NAME --region=$REGION --zone=$ZONE
 
-# Once on master node:
-# Copy JAR from Cloud Storage
-gsutil cp gs://${BUCKET_NAME}/flink-jobs/ride-analytics-1.0.0.jar ~/
+# Download JAR from GCS
+gsutil cp gs://${CLUSTER_NAME}-flink-jobs/ride-analytics-1.0.jar /tmp/
+
+# Get Kafka credentials from Kubernetes secret (or set manually)
+# Note: You'll need to set these environment variables
+export KAFKA_BOOTSTRAP_SERVERS="<from-terraform-output-or-secret>"
+export KAFKA_API_KEY="<from-terraform-output-or-secret>"
+export KAFKA_API_SECRET="<from-terraform-output-or-secret>"
 
 # Submit Flink job
-flink run -d ~/ride-analytics-1.0.0.jar
+/opt/flink/bin/flink run \
+  -c com.ridebooking.RideAnalyticsJob \
+  /tmp/ride-analytics-1.0.jar
 
-# Exit SSH
-exit
+# Verify job is running
+/opt/flink/bin/flink list
 ```
 
-### 7.6 Monitor Flink Job
+**✅ Expected:** Job submitted successfully with JobID
+
+### 7.7 Monitor Flink Job
+
+**Via Flink Web UI:**
+- Access: `http://localhost:8081` (via SSH tunnel from step 7.5)
+- Check "Running Jobs" tab
+- View job metrics, throughput, and checkpoints
+
+**Via CLI:**
 
 ```bash
-# List Dataproc jobs
-gcloud dataproc jobs list \
-  --cluster=$CLUSTER_NAME \
-  --region=$REGION
+# SSH into Dataproc master
+gcloud dataproc clusters ssh $CLUSTER_NAME --region=$REGION --zone=$ZONE
+
+# List running jobs
+/opt/flink/bin/flink list
 
 # Get job details
-JOB_ID="<job-id-from-previous-command>"
-gcloud dataproc jobs describe $JOB_ID \
-  --region=$REGION
+/opt/flink/bin/flink info <job-id>
 
-# View job logs
-gcloud dataproc jobs wait $JOB_ID \
-  --region=$REGION
-
-# Access Flink UI (via SSH tunnel)
-# http://localhost:8088
+# View logs
+tail -f /opt/flink/log/flink-*-jobmanager-*.log
+tail -f /opt/flink/log/flink-*-taskmanager-*.log
 ```
 
-**Via Flink CLI on master node:**
+**Via GCP Console:**
+1. Navigate to Dataproc in GCP Console
+2. Select your cluster
+3. Check "Jobs" tab for running jobs
+4. View logs in Cloud Logging
 
-```bash
-# SSH to master
-gcloud compute ssh $MASTER_NODE \
-  --project=$PROJECT_ID \
-  --zone=${REGION}-a
-
-# List running Flink jobs
-flink list
-
-# Get job details
-flink info -d <job-id>
-
-# Cancel job (if needed)
-flink cancel <job-id>
-```
-
-**✅ Expected:** Flink job running on Dataproc, consuming from Confluent Kafka `rides` topic, publishing to `ride-results` topic
+**✅ Expected:** Flink job running, consuming from Confluent Cloud Kafka, writing to Firestore
 
 ---
 
@@ -986,7 +966,8 @@ echo "Check Firestore at: https://console.cloud.google.com/firestore"
 ```bash
 # Get cluster details
 CLUSTER_NAME=$(cd infra/gcp && terraform output -raw dataproc_cluster_name)
-REGION="us-central1"
+REGION=$(cd infra/gcp && terraform output -raw gcp_region)
+ZONE=$(cd infra/gcp && terraform output -raw gcp_zone)
 
 # Check cluster status
 gcloud dataproc clusters describe $CLUSTER_NAME \
@@ -1016,11 +997,10 @@ MASTER_NODE=$(gcloud dataproc clusters describe $CLUSTER_NAME \
   --format="value(config.masterConfig.instanceNames[0])")
 
 gcloud compute ssh $MASTER_NODE \
-  --project=$(gcloud config get-value project) \
-  --zone=${REGION}-a \
-  -- -L 8088:localhost:8088 -N -f
+  --zone=$ZONE \
+  -- -L 8081:localhost:8081 -N -f
 
-# Open http://localhost:8088 in browser
+# Open http://localhost:8081 in browser
 ```
 
 **✅ Expected:** All components running and healthy
@@ -1215,8 +1195,8 @@ gcloud dataproc jobs wait $JOB_ID --region=$REGION
 ```
 
 **Via Flink UI:**
-1. SSH tunnel to master: `gcloud compute ssh <master-node> -- -L 8088:localhost:8088 -N -f`
-2. Open http://localhost:8088
+1. SSH tunnel to master: `gcloud compute ssh <master-node> --zone=<zone> -- -L 8081:localhost:8081 -N -f`
+2. Open http://localhost:8081
 3. View running jobs and metrics
 
 **✅ Expected:** Flink job running and processing events from Kafka
@@ -1608,13 +1588,13 @@ cat frontend/nextjs-ui/.env.local
 **Solution:**
 
 ```bash
-# Check AWS/Azure credentials
+# Check AWS/GCP credentials
 aws sts get-caller-identity
-az account show
+gcloud auth list
 
 # Check for resource limits or quota issues
 # AWS: Check service quotas in AWS Console
-# Azure: Check subscription limits
+# GCP: Check quota limits: gcloud compute project-info describe
 
 # Re-run with debug logging
 TF_LOG=DEBUG terraform apply
@@ -1638,11 +1618,12 @@ Before recording your demo video, verify:
 - [ ] Grafana dashboard accessible and showing metrics
 - [ ] Prometheus collecting metrics from all services
 - [ ] Lambda function working and logging to CloudWatch
-- [ ] Confluent Cloud Kafka cluster running
-- [ ] Kafka topics created (`rides`, `ride-results`)
+- [ ] Confluent Cloud Kafka cluster running (created manually at https://confluent.cloud)
+- [ ] Kafka topics created (`rides`, `ride-results`) in Confluent Cloud
+- [ ] Kafka API keys created and configured in Terraform
 - [ ] Kafka receiving events from ride service
 - [ ] Flink job running on Google Dataproc
-- [ ] Flink consuming from Kafka and processing streams
+- [ ] Flink consuming from Confluent Cloud Kafka and processing streams
 - [ ] Firestore storing analytics results from Flink
 - [ ] Frontend accessible and all pages working
 - [ ] User registration and login working
@@ -1690,7 +1671,7 @@ kubectl top nodes
 kubectl top pods
 
 # Terraform common commands
-cd infra/aws  # or infra/azure
+cd infra/aws  # or infra/gcp
 terraform plan
 terraform apply
 terraform destroy
@@ -1708,7 +1689,7 @@ argocd app diff <app-name>
 
 ## Cleanup (When Done)
 
-To avoid AWS/Azure charges:
+To avoid AWS/GCP charges:
 
 ```bash
 # Delete Kubernetes resources
@@ -1733,6 +1714,7 @@ terraform destroy
 # Type 'yes' when prompted
 
 # Note: Manually delete Confluent Cloud Kafka cluster from https://confluent.cloud
+# Note: Firestore database deletion may take time - check GCP Console
 ```
 
 ---
@@ -1757,7 +1739,8 @@ If you encounter issues not covered in this guide:
 2. Check events: `kubectl get events --sort-by='.lastTimestamp'`
 3. Review Terraform outputs: `terraform output`
 4. Check AWS CloudWatch logs for Lambda
-5. Check Azure Portal for Event Hub and Cosmos DB metrics
+5. Check GCP Console for Dataproc and Firestore metrics
+6. Check Confluent Cloud UI for Kafka metrics
 
 ---
 

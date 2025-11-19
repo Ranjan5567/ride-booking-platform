@@ -1,10 +1,5 @@
-variable "project_name" {
-  description = "Project name for resource naming"
-  type        = string
-}
-
 variable "resource_group_name" {
-  description = "Name of the resource group"
+  description = "Resource group name"
   type        = string
 }
 
@@ -13,9 +8,7 @@ variable "location" {
   type        = string
 }
 
-variable "environment" {
-  description = "Environment name"
+variable "project_name" {
+  description = "Project name for naming resources"
   type        = string
-  default     = "dev"
 }
-

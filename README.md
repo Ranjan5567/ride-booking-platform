@@ -12,15 +12,17 @@
 ## 🎯 **Project Overview**
 
 A fully functional ride booking platform demonstrating:
-- ✅ **Multi-cloud architecture** (AWS + GCP)
+- ✅ **Multi-cloud architecture** (AWS + Azure)
 - ✅ **Microservices** (6 services across 2 clouds)
-- ✅ **Real-time streaming** (Apache Flink on Dataproc)
+- ✅ **Real-time streaming** (Apache Flink on Azure Container)
 - ✅ **GitOps deployment** (ArgoCD)
 - ✅ **Auto-scaling** (HPA on EKS)
 - ✅ **Observability** (Prometheus + Grafana + Loki)
 - ✅ **Load testing** (k6)
 
 **Built for:** BITS Pilani Cloud Computing Project (60 Marks)
+
+**Provider B:** Azure (Event Hubs + Flink Container + Table Storage)
 
 ---
 
@@ -46,20 +48,20 @@ A fully functional ride booking platform demonstrating:
    └─────────────┬────────────────────────┘
                  │
           ┌──────▼────────┐
-          │ Confluent     │
-          │ Cloud Kafka   │
-          │(Multi-Cloud)  │
+          │ Azure Event   │
+          │ Hubs (Kafka)  │
+          │               │
           └──────┬────────┘
                  │
    ┌─────────────▼────────────────────────┐
-   │      GCP (Provider B)                │
+   │      Azure (Provider B)              │
    │  ┌─────────────────────────────────┐│
-   │  │ Dataproc Cluster (Flink)         ││
+   │  │ Flink Container Instance         ││
    │  │ • Real-time aggregation          ││
    │  │ • Time-windowed processing       ││
    │  └─────────────────────────────────┘│
-   │  • Firestore (NoSQL Analytics)       │
-   │  • Cloud Storage (Staging)           │
+   │  • Table Storage (NoSQL Analytics)   │
+   │  • Event Hubs (Kafka-compatible)     │
    └──────────────────────────────────────┘
 ```
 
@@ -88,9 +90,9 @@ A fully functional ride booking platform demonstrating:
 │   ├── aws/                       # AWS Terraform (Provider A)
 │   │   ├── main.tf                # EKS, RDS, Lambda, S3
 │   │   └── modules/               # Modular resources
-│   └── gcp/                       # GCP Terraform (Provider B)
-│       ├── main.tf                # Dataproc, Firestore
-│       └── modules/               # Dataproc & Firestore modules
+│   └── azure/                     # Azure Terraform (Provider B)
+│       ├── main.tf                # Event Hubs, Flink, Table Storage
+│       └── modules/               # Event Hub, Flink, Storage modules
 │
 ├── gitops/                        # Kubernetes manifests
 │   ├── user-service-deployment.yaml
@@ -114,19 +116,12 @@ A fully functional ride booking platform demonstrating:
 
 ### **Prerequisites**
 - AWS Account + CLI configured
-- GCP Account + gcloud CLI configured
-- Confluent Cloud account (Free $400 credit)
+- Azure Account + CLI configured
 - Docker, Terraform, kubectl, Helm installed
 
 ### **Deploy**
 
-1. **Setup Confluent Cloud** (5 min)
-   - Sign up at https://confluent.cloud
-   - Create Basic cluster in GCP us-central1
-   - Create topics: `rides`, `ride-results`
-   - Get API Key & Bootstrap servers
-
-2. **Deploy Infrastructure** (10 min)
+1. **Deploy Infrastructure** (10 min)
    ```bash
    # AWS
    cd infra/aws
@@ -134,10 +129,9 @@ A fully functional ride booking platform demonstrating:
    # Edit terraform.tfvars
    terraform init && terraform apply
    
-   # GCP
-   cd ../gcp
-   cp terraform.tfvars.example terraform.tfvars
-   # Edit terraform.tfvars (add Confluent credentials)
+   # Azure
+   cd ../azure
+   # terraform.tfvars already has credentials
    terraform init && terraform apply
    ```
 
@@ -152,23 +146,22 @@ A fully functional ride booking platform demonstrating:
    ```bash
    cd analytics/flink-job
    mvn clean package
-   gcloud dataproc jobs submit flink ...
+   # Upload to Flink container via REST API
    ```
 
-**📖 See `QUICKSTART.md` for complete commands**
+**📖 See `DEPLOYMENT.md` for complete commands**
 
 ---
 
 ## 💰 **Cost Breakdown**
 
-**Total: ~$0.37/hour = $8.88/day**
+**Total: ~$0.30/hour = $7.20/day**
 
 - **AWS:** $0.17/hour (EKS, RDS, Lambda, S3)
-- **GCP:** $0.16/hour (Dataproc, Firestore)
-- **Confluent:** $0.04/hour (~$1/day, Basic cluster)
+- **Azure:** $0.13/hour (Event Hubs, Flink Container, Table Storage)
 
-**Development Cost (60 hours):** ~$22-25  
-**Demo Cost (10 hours):** ~$4-5
+**Development Cost (60 hours):** ~$18-20  
+**Demo Cost (10 hours):** ~$3-4
 
 **💡 Tip:** Destroy infrastructure when not in use!
 
@@ -179,16 +172,16 @@ A fully functional ride booking platform demonstrating:
 | Requirement | Implementation | Status |
 |-------------|----------------|--------|
 | **6 Microservices** | user, driver, ride, payment, notification (Lambda), analytics (Flink) | ✅ |
-| **Multiple Clouds** | AWS (Provider A) + GCP (Provider B) | ✅ |
+| **Multiple Clouds** | AWS (Provider A) + Azure (Provider B) | ✅ |
 | **IaC** | Terraform for all infrastructure | ✅ |
 | **Managed K8s** | AWS EKS | ✅ |
 | **HPA** | ride-service & user-service | ✅ |
 | **GitOps** | ArgoCD | ✅ |
-| **Flink on Managed Cluster** | Google Dataproc | ✅ |
-| **Managed Kafka** | Confluent Cloud | ✅ |
+| **Flink on Managed Cluster** | Azure Container Instance | ✅ |
+| **Managed Kafka** | Azure Event Hubs (Kafka-compatible) | ✅ |
 | **SQL Database** | RDS PostgreSQL | ✅ |
-| **NoSQL Database** | Google Firestore | ✅ |
-| **Object Storage** | S3 + Cloud Storage | ✅ |
+| **NoSQL Database** | Azure Table Storage | ✅ |
+| **Object Storage** | S3 + Azure Storage | ✅ |
 | **Serverless** | AWS Lambda | ✅ |
 | **Observability** | Prometheus + Grafana + Loki | ✅ |
 | **Load Testing** | k6 | ✅ |
@@ -216,8 +209,8 @@ A fully functional ride booking platform demonstrating:
 
 ### **Streaming**
 - **Platform:** Apache Flink 1.17
-- **Cluster:** Google Dataproc
-- **Message Broker:** Confluent Cloud Kafka
+- **Cluster:** Azure Container Instance
+- **Message Broker:** Azure Event Hubs (Kafka-compatible)
 - **Processing:** Time-windowed aggregation
 
 ### **Monitoring**
@@ -243,8 +236,8 @@ A fully functional ride booking platform demonstrating:
 
 ### **3. Multi-Cloud Architecture**
 - AWS for core application services
-- GCP for analytics workload
-- Confluent Cloud for cross-cloud messaging
+- Azure for analytics workload
+- Event Hubs for Kafka-compatible messaging
 
 ### **4. GitOps Deployment**
 - All deployments via ArgoCD
@@ -261,10 +254,7 @@ A fully functional ride booking platform demonstrating:
 ## 📖 **Documentation**
 
 - **`README.md`** (this file) - Project overview
-- **`QUICKSTART.md`** - 30-minute deployment guide
 - **`DEPLOYMENT.md`** - Comprehensive step-by-step instructions
-- **`ARCHITECTURE_SUMMARY.md`** - Architecture details & diagrams
-- **`GCP_MIGRATION_SUMMARY.md`** - Provider B migration notes
 
 ---
 
@@ -297,7 +287,7 @@ kubectl get pods -l app=ride-service --watch
 
 By completing this project, you will learn:
 
-1. **Multi-Cloud Architecture** - Deploy across AWS & GCP
+1. **Multi-Cloud Architecture** - Deploy across AWS & Azure
 2. **Microservices Design** - Build & deploy distributed systems
 3. **Stream Processing** - Real-time data processing with Flink
 4. **Infrastructure as Code** - Terraform for cloud resources
@@ -311,10 +301,10 @@ By completing this project, you will learn:
 ## 🏆 **Project Highlights**
 
 - ✅ **Production-Grade:** Industry best practices
-- ✅ **Cost-Optimized:** ~$25 total for development
+- ✅ **Cost-Optimized:** ~$20 total for development
 - ✅ **Well-Documented:** Comprehensive guides
 - ✅ **Fully Automated:** IaC + GitOps
-- ✅ **Scalable:** HPA + Kafka + Flink
+- ✅ **Scalable:** HPA + Event Hubs + Flink
 - ✅ **Observable:** Full monitoring stack
 
 ---
@@ -324,20 +314,17 @@ By completing this project, you will learn:
 **⚠️ Important:** Destroy resources when not in use to avoid charges
 
 ```bash
-# Destroy GCP
-cd infra/gcp && terraform destroy
+# Destroy Azure
+cd infra/azure && terraform destroy
 
 # Destroy AWS
 cd infra/aws && terraform destroy
-
-# Delete Confluent Cloud cluster from https://confluent.cloud
 ```
 
 ---
 
 ## 📞 **Support**
 
-- **Quick Start:** See `QUICKSTART.md`
 - **Detailed Guide:** See `DEPLOYMENT.md`
 - **Troubleshooting:** See `DEPLOYMENT.md` → Troubleshooting section
 

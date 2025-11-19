@@ -9,6 +9,7 @@ variable "location" {
 }
 
 variable "project_name" {
-  description = "Project name for naming resources"
+  description = "Project name prefix"
   type        = string
 }
+
