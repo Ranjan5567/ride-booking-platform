@@ -1,102 +1,169 @@
 package com.ridebooking;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
-import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
-import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer;
-import org.apache.flink.api.common.functions.AggregateFunction;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
+import org.apache.flink.connector.gcp.pubsub.source.PubSubSource;
+import org.apache.flink.connector.gcp.pubsub.sink.PubSubSink;
+import org.apache.flink.api.common.serialization.SimpleStringSchema;
+import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 
-import java.util.Properties;
+import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.FirestoreOptions;
+
+import java.io.Serializable;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
 public class RideAnalyticsJob {
+
     public static void main(String[] args) throws Exception {
+        final String projectId = getRequiredEnv("PUBSUB_PROJECT_ID");
+        final String ridesSubscription = getRequiredEnv("PUBSUB_RIDES_SUBSCRIPTION");
+        final String resultsTopic = getRequiredEnv("PUBSUB_RESULTS_TOPIC");
+        final String firestoreCollection = System.getenv().getOrDefault("FIRESTORE_COLLECTION", "ride_analytics");
+
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        
-        // Kafka consumer properties (Azure Event Hub)
-        Properties kafkaProps = new Properties();
-        kafkaProps.setProperty("bootstrap.servers", System.getenv("EVENTHUB_NAMESPACE") + ".servicebus.windows.net:9093");
-        kafkaProps.setProperty("security.protocol", "SASL_SSL");
-        kafkaProps.setProperty("sasl.mechanism", "PLAIN");
-        kafkaProps.setProperty("sasl.jaas.config", 
-            "org.apache.kafka.common.security.plain.PlainLoginModule required " +
-            "username=\"$ConnectionString\" " +
-            "password=\"" + System.getenv("EVENTHUB_CONNECTION_STRING") + "\";");
-        
-        // Consume from Event Hub
-        FlinkKafkaConsumer<String> consumer = new FlinkKafkaConsumer<>(
-            "rides",
-            new SimpleStringSchema(),
-            kafkaProps
-        );
-        
-        DataStream<String> rideStream = env.addSource(consumer);
-        
-        // Parse JSON and extract city
-        DataStream<Tuple2<String, Integer>> cityRides = rideStream
-            .map(new MapFunction<String, Tuple2<String, Integer>>() {
-                @Override
-                public Tuple2<String, Integer> map(String value) throws Exception {
-                    // Simple JSON parsing (use proper JSON library in production)
-                    String city = extractCity(value);
-                    return new Tuple2<>(city, 1);
-                }
-                
-                private String extractCity(String json) {
-                    // Extract city from JSON string
-                    int cityIndex = json.indexOf("\"city\":\"");
-                    if (cityIndex != -1) {
-                        int start = cityIndex + 8;
-                        int end = json.indexOf("\"", start);
-                        return json.substring(start, end);
-                    }
-                    return "unknown";
-                }
-            });
-        
-        // Aggregate rides per city per minute
-        DataStream<String> aggregated = cityRides
-            .keyBy(0)
+
+        PubSubSource<String> ridesSource = PubSubSource.newBuilder()
+            .setProjectName(projectId)
+            .setSubscriptionName(ridesSubscription)
+            .setDeserializationSchema(new SimpleStringSchema())
+            .build();
+
+        DataStream<String> rideStream = env.fromSource(
+            ridesSource,
+            WatermarkStrategy.noWatermarks(),
+            "gcp-pubsub-rides");
+
+        DataStream<Tuple2<String, Integer>> cityEvents = rideStream
+            .map(new ExtractCity());
+
+        DataStream<RideAggregate> aggregates = cityEvents
+            .keyBy(value -> value.f0)
             .window(TumblingProcessingTimeWindows.of(Time.minutes(1)))
-            .aggregate(new AggregateFunction<Tuple2<String, Integer>, Integer, Integer>() {
-                @Override
-                public Integer createAccumulator() {
-                    return 0;
+            .apply(new AggregateWindowFunction());
+
+        DataStream<String> aggregateJson = aggregates.map(new AggregateToJson());
+
+        PubSubSink<String> resultsSink = PubSubSink.newBuilder()
+            .setProjectName(projectId)
+            .setTopicName(resultsTopic)
+            .setSerializationSchema(new SimpleStringSchema())
+            .build();
+
+        aggregateJson.sinkTo(resultsSink);
+        aggregates.addSink(new FirestoreSink(firestoreCollection));
+
+        env.execute("Ride Analytics Job (Pub/Sub -> Firestore)");
+    }
+
+    private static String getRequiredEnv(String key) {
+        String value = System.getenv(key);
+        if (value == null || value.isEmpty()) {
+            throw new IllegalArgumentException("Missing required environment variable: " + key);
+        }
+        return value;
+    }
+
+    // === Helper classes ===
+    static class ExtractCity implements MapFunction<String, Tuple2<String, Integer>> {
+        @Override
+        public Tuple2<String, Integer> map(String value) {
+            String city = "unknown";
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                Map<?, ?> payload = mapper.readValue(value, Map.class);
+                Object cityValue = payload.get("city");
+                if (cityValue != null) {
+                    city = cityValue.toString();
                 }
-                
-                @Override
-                public Integer add(Tuple2<String, Integer> value, Integer accumulator) {
-                    return accumulator + value.f1;
-                }
-                
-                @Override
-                public Integer getResult(Integer accumulator) {
-                    return accumulator;
-                }
-                
-                @Override
-                public Integer merge(Integer a, Integer b) {
-                    return a + b;
-                }
-            })
-            .map(new MapFunction<Integer, String>() {
-                @Override
-                public String map(Integer value) throws Exception {
-                    return "{\"count\":" + value + "}";
-                }
-            });
-        
-        // Write to Cosmos DB (via HTTP sink or custom sink)
-        // For demo, we'll use a simple print sink
-        aggregated.print();
-        
-        env.execute("Ride Analytics Job");
+            } catch (Exception ignored) {
+                // fallback to unknown city
+            }
+            return Tuple2.of(city, 1);
+        }
+    }
+
+    static class AggregateWindowFunction implements WindowFunction<Tuple2<String, Integer>, RideAggregate, String, TimeWindow> {
+        @Override
+        public void apply(String key, TimeWindow window, Iterable<Tuple2<String, Integer>> input, org.apache.flink.util.Collector<RideAggregate> out) {
+            long total = 0L;
+            for (Tuple2<String, Integer> tuple : input) {
+                total += tuple.f1;
+            }
+
+            RideAggregate aggregate = new RideAggregate();
+            aggregate.city = key;
+            aggregate.count = total;
+            aggregate.windowStartEpochMillis = window.getStart();
+            aggregate.windowEndEpochMillis = window.getEnd();
+
+            out.collect(aggregate);
+        }
+    }
+
+    static class AggregateToJson implements MapFunction<RideAggregate, String> {
+        private static final ObjectMapper mapper = new ObjectMapper();
+
+        @Override
+        public String map(RideAggregate value) throws Exception {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("city", value.city);
+            payload.put("count", value.count);
+            payload.put("windowStart", Instant.ofEpochMilli(value.windowStartEpochMillis).toString());
+            payload.put("windowEnd", Instant.ofEpochMilli(value.windowEndEpochMillis).toString());
+            return mapper.writeValueAsString(payload);
+        }
+    }
+
+    static class FirestoreSink extends RichSinkFunction<RideAggregate> {
+        private final String collectionName;
+        private transient Firestore firestore;
+
+        FirestoreSink(String collectionName) {
+            this.collectionName = collectionName;
+        }
+
+        @Override
+        public void open(Configuration parameters) {
+            FirestoreOptions options = FirestoreOptions.getDefaultInstance();
+            firestore = options.getService();
+        }
+
+        @Override
+        public void invoke(RideAggregate value, Context context) throws Exception {
+            if (firestore == null || value == null) {
+                return;
+            }
+            String docId = value.city + "-" + value.windowStartEpochMillis;
+            firestore.collection(collectionName).document(docId).set(value.toMap()).get();
+        }
+    }
+
+    static class RideAggregate implements Serializable {
+        String city;
+        long count;
+        long windowStartEpochMillis;
+        long windowEndEpochMillis;
+
+        Map<String, Object> toMap() {
+            Map<String, Object> map = new HashMap<>();
+            map.put("city", city);
+            map.put("count", count);
+            map.put("windowStart", Instant.ofEpochMilli(windowStartEpochMillis).toString());
+            map.put("windowEnd", Instant.ofEpochMilli(windowEndEpochMillis).toString());
+            map.put("ttlSeconds", 3600);
+            return map;
+        }
     }
 }
-

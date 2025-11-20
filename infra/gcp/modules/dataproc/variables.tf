@@ -34,23 +34,3 @@ variable "project_name" {
   description = "Project name prefix"
   type        = string
 }
-
-# Kafka Configuration
-variable "kafka_bootstrap_servers" {
-  description = "Kafka bootstrap servers (Confluent Cloud)"
-  type        = string
-  sensitive   = true
-}
-
-variable "kafka_api_key" {
-  description = "Kafka API Key (Confluent Cloud)"
-  type        = string
-  sensitive   = true
-}
-
-variable "kafka_api_secret" {
-  description = "Kafka API Secret (Confluent Cloud)"
-  type        = string
-  sensitive   = true
-}
-

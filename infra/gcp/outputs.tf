@@ -38,6 +38,35 @@ output "gcp_zone" {
   value       = var.gcp_zone
 }
 
-# Note: Kafka bootstrap servers come from Confluent Cloud (external service)
-# They are provided via terraform.tfvars, not as Terraform outputs
+output "gcp_project_id" {
+  description = "GCP Project ID"
+  value       = var.gcp_project_id
+}
+
+# Pub/Sub resources
+output "pubsub_rides_topic" {
+  description = "Ride events Pub/Sub topic name"
+  value       = module.pubsub.rides_topic
+}
+
+output "pubsub_rides_subscription" {
+  description = "Subscription Flink uses to consume ride events"
+  value       = module.pubsub.rides_subscription
+}
+
+output "pubsub_results_topic" {
+  description = "Aggregated analytics Pub/Sub topic"
+  value       = module.pubsub.ride_results_topic
+}
+
+output "pubsub_publisher_service_account_email" {
+  description = "Service account email ride-service uses to publish to Pub/Sub"
+  value       = module.pubsub.publisher_service_account_email
+}
+
+output "pubsub_publisher_service_account_key" {
+  description = "Base64 encoded service account key JSON (pass to ride-service secret)"
+  value       = module.pubsub.publisher_service_account_key
+  sensitive   = true
+}
 

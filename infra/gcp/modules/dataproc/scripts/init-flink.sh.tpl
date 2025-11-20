@@ -45,19 +45,10 @@ rest.port: 8081
 rest.address: 0.0.0.0
 EOF
 
-# Download Flink Kafka connector
-echo "Downloading Flink Kafka connector..."
+# Download Flink Pub/Sub connector
+echo "Downloading Flink GCP Pub/Sub connector..."
 cd ${FLINK_HOME}/lib
-wget -q https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kafka/3.0.1-1.18/flink-sql-connector-kafka-3.0.1-1.18.jar
-
-# Create Kafka configuration file for Confluent Cloud
-cat > ${FLINK_HOME}/conf/kafka.properties <<EOF
-# Confluent Cloud Kafka Configuration
-bootstrap.servers=${kafka_bootstrap_servers}
-security.protocol=SASL_SSL
-sasl.mechanism=PLAIN
-sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${kafka_api_key}" password="${kafka_api_secret}";
-EOF
+wget -q https://repo1.maven.org/maven2/org/apache/flink/flink-connector-gcp-pubsub/3.0.1-1.18/flink-connector-gcp-pubsub-3.0.1-1.18.jar
 
 # Set environment variables
 echo "export FLINK_HOME=${FLINK_HOME}" >> ~/.bashrc

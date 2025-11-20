@@ -5,7 +5,7 @@
 [![Infrastructure](https://img.shields.io/badge/IaC-Terraform-7B42BC)](https://www.terraform.io/)
 [![Kubernetes](https://img.shields.io/badge/K8s-EKS-326CE5)](https://aws.amazon.com/eks/)
 [![Streaming](https://img.shields.io/badge/Streaming-Apache%20Flink-E6526F)](https://flink.apache.org/)
-[![Kafka](https://img.shields.io/badge/Kafka-Confluent%20Cloud-00D4FF)](https://confluent.cloud/)
+[![Pub/Sub](https://img.shields.io/badge/Pub%2FSub-Google%20Cloud-34A853)](https://cloud.google.com/pubsub)
 
 ---
 
@@ -22,7 +22,7 @@ A fully functional ride booking platform demonstrating:
 
 **Built for:** BITS Pilani Cloud Computing Project (60 Marks)
 
-**Provider B:** GCP (Dataproc + Firestore + Confluent Cloud Kafka)
+**Provider B:** GCP (Dataproc + Firestore + Cloud Pub/Sub)
 
 ---
 
@@ -117,7 +117,6 @@ A fully functional ride booking platform demonstrating:
 ### **Prerequisites**
 - AWS Account + CLI configured
 - GCP Account + CLI configured
-- Confluent Cloud account (for Kafka)
 - Docker, Terraform, kubectl, Helm installed
 
 ### **Deploy**
@@ -133,7 +132,7 @@ A fully functional ride booking platform demonstrating:
    # GCP
    cd ../gcp
    cp terraform.tfvars.example terraform.tfvars
-   # Edit terraform.tfvars with your GCP project and Confluent Cloud credentials
+   # Edit terraform.tfvars with your GCP project values (Pub/Sub is auto-provisioned)
    terraform init && terraform apply
    ```
 
@@ -157,11 +156,10 @@ A fully functional ride booking platform demonstrating:
 
 ## 💰 **Cost Breakdown**
 
-**Total: ~$0.30/hour = $7.20/day**
+**Total: ~$0.27/hour = $6.48/day**
 
 - **AWS:** $0.17/hour (EKS, RDS, Lambda, S3)
-- **GCP:** $0.10/hour (Dataproc, Firestore)
-- **Confluent Cloud:** $0.03/hour (Basic Kafka cluster)
+- **GCP:** $0.10/hour (Dataproc, Firestore, Pub/Sub)
 
 **Development Cost (60 hours):** ~$18-20  
 **Demo Cost (10 hours):** ~$3-4
@@ -181,7 +179,7 @@ A fully functional ride booking platform demonstrating:
 | **HPA** | ride-service & user-service | ✅ |
 | **GitOps** | ArgoCD | ✅ |
 | **Flink on Managed Cluster** | Google Dataproc | ✅ |
-| **Managed Kafka** | Confluent Cloud | ✅ |
+| **Managed Pub/Sub** | Google Cloud Pub/Sub | ✅ |
 | **SQL Database** | RDS PostgreSQL | ✅ |
 | **NoSQL Database** | Firestore | ✅ |
 | **Object Storage** | S3 | ✅ |
@@ -213,7 +211,7 @@ A fully functional ride booking platform demonstrating:
 ### **Streaming**
 - **Platform:** Apache Flink 1.18
 - **Cluster:** Google Dataproc
-- **Message Broker:** Confluent Cloud (Managed Kafka)
+- **Message Broker:** Google Cloud Pub/Sub (rides + ride-results topics)
 - **Processing:** Time-windowed aggregation
 
 ### **Monitoring**

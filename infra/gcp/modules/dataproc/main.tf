@@ -98,11 +98,7 @@ resource "google_storage_bucket" "flink_scripts" {
 resource "google_storage_bucket_object" "flink_init_script" {
   name    = "init-flink.sh"
   bucket  = google_storage_bucket.flink_scripts.name
-  content = templatefile("${path.module}/scripts/init-flink.sh.tpl", {
-    kafka_bootstrap_servers = var.kafka_bootstrap_servers
-    kafka_api_key           = var.kafka_api_key
-    kafka_api_secret        = var.kafka_api_secret
-  })
+  content = file("${path.module}/scripts/init-flink.sh.tpl")
   content_type = "text/x-shellscript"
 }
 
