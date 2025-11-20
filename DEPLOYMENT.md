@@ -24,7 +24,7 @@ Complete step-by-step guide to deploy the multi-cloud ride booking platform for 
 
 ⚠️ **Terraform alone will NOT complete the deployment.** 
 
-`terraform apply` only provisions the infrastructure (VPC, EKS, RDS, Lambda, S3, Google Dataproc (Flink), Confluent Kafka, Firestore, etc.). 
+`terraform apply` only provisions the infrastructure (VPC, EKS, RDS, Lambda, S3, Google Dataproc (Flink), Cloud Pub/Sub, Firestore, etc.). 
 
 You must also:
 - Build and push Docker images
@@ -173,17 +173,17 @@ terraform output
 - API Gateway URL
 - S3 bucket name
 
-### 2.2 Deploy GCP Infrastructure (Dataproc + Firestore + Confluent Cloud Kafka)
+### 2.2 Deploy GCP Infrastructure (Dataproc + Firestore + Pub/Sub)
 
-GCP provides Dataproc (Flink cluster), Firestore (NoSQL), and Confluent Cloud (managed Kafka).
+GCP provides Dataproc (Flink cluster), Firestore (NoSQL), and **Cloud Pub/Sub** (managed pub-sub) for the ride analytics pipeline. Terraform provisions the Pub/Sub topics (`rides`, `ride-results`), the subscription that Flink consumes, and a dedicated service account/key for the AWS ride-service publisher.
 
 **Prerequisites:**
-1. **Confluent Cloud Setup** (Do this first):
-   - Sign up at https://confluent.cloud
-   - Create a Kafka cluster (Basic plan is sufficient)
-   - Create API keys (go to API Keys section)
-   - Create topics: `rides` and `ride-results`
-   - Save: Bootstrap servers, API key, and API secret
+1. Install and authenticate the gcloud CLI:
+   ```bash
+   gcloud init
+   gcloud auth application-default login
+   ```
+2. Ensure the GCP project `careful-cosine-478715-a0` has billing enabled and Dataproc/Pub/Sub APIs are allowed.
 
 ```bash
 cd infra/gcp
@@ -209,11 +209,6 @@ dataproc_num_workers  = 2
 
 # Firestore Configuration
 firestore_location = "asia-south1"  # Mumbai, India
-
-# Confluent Cloud Kafka Configuration (from https://confluent.cloud)
-kafka_bootstrap_servers = "pkc-xxxxx.region.provider.confluent.cloud:9092"  # ⚠️ CHANGE THIS
-kafka_api_key           = "your-confluent-api-key"                          # ⚠️ CHANGE THIS
-kafka_api_secret        = "your-confluent-api-secret"                      # ⚠️ CHANGE THIS
 ```
 
 **Deploy GCP Infrastructure:**
@@ -232,6 +227,13 @@ terraform apply
 mkdir -p ../../outputs
 terraform output dataproc_cluster_name > ../../outputs/dataproc_cluster.txt
 terraform output firestore_database_id > ../../outputs/firestore_db.txt
+terraform output pubsub_rides_topic > ../../outputs/pubsub_rides_topic.txt
+terraform output pubsub_rides_subscription > ../../outputs/pubsub_rides_subscription.txt
+terraform output pubsub_publisher_service_account_email > ../../outputs/pubsub_publisher_sa.txt
+terraform output pubsub_results_topic > ../../outputs/pubsub_results_topic.txt
+
+# Save Pub/Sub publisher key (base64 JSON) to a file for Kubernetes secret creation
+terraform output -json pubsub_publisher_service_account_key | jq -r '.' > ../../outputs/pubsub_publisher_sa_key.b64
 
 # Display all outputs
 terraform output
@@ -242,8 +244,10 @@ terraform output
 - Dataproc cluster endpoint
 - Firestore database ID: `ride-booking-analytics`
 - Firestore database location: `asia-south1`
+- Pub/Sub topics and subscription names
+- Pub/Sub publisher service account email (ride-service uses this SA key)
 
-**⏱️ Deployment Time:** ~10-15 minutes (Dataproc cluster provisioning)
+**⏱️ Deployment Time:** ~10-15 minutes (Dataproc cluster provisioning + Pub/Sub resources)
 
 ### 2.3 Configure kubectl for EKS
 
@@ -381,34 +385,34 @@ kubectl create secret generic db-credentials \
 kubectl get secret db-credentials
 ```
 
-### 4.2 Create GCP and Kafka Credentials Secret
+### 4.2 Create Pub/Sub Publisher Secret
 
 ```bash
 cd infra/gcp
 
-# Get Kafka credentials from terraform.tfvars (you set these during Phase 2.2)
-# Or manually set them:
-KAFKA_BOOTSTRAP="pkc-xxxxx.region.provider.confluent.cloud:9092"  # From Confluent Cloud
-KAFKA_API_KEY="your-confluent-api-key"                          # From Confluent Cloud
-KAFKA_API_SECRET="your-confluent-api-secret"                    # From Confluent Cloud
+# Pub/Sub publisher key was saved during Phase 2.2
+PUBSUB_KEY_B64_FILE=../../outputs/pubsub_publisher_sa_key.b64
 
-# Get Firestore database ID from Terraform output
-FIRESTORE_DB=$(terraform output -raw firestore_database_id)
+if [ ! -f "${PUBSUB_KEY_B64_FILE}" ]; then
+  echo "Missing ${PUBSUB_KEY_B64_FILE}. Run terraform output again to capture the key."
+  exit 1
+fi
 
-# Create secret for Kafka and Firestore
-kubectl create secret generic gcp-credentials \
-  --from-literal=kafka_bootstrap_servers="${KAFKA_BOOTSTRAP}" \
-  --from-literal=kafka_api_key="${KAFKA_API_KEY}" \
-  --from-literal=kafka_api_secret="${KAFKA_API_SECRET}" \
-  --from-literal=firestore_database_id="${FIRESTORE_DB}"
+# Decode the base64 key into JSON (never commit this file)
+base64 -d "${PUBSUB_KEY_B64_FILE}" > /tmp/pubsub-publisher.json
+
+# Create the Kubernetes secret used by ride-service
+kubectl create secret generic pubsub-credentials \
+  --from-file=publisher_sa.json=/tmp/pubsub-publisher.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+rm /tmp/pubsub-publisher.json
 
 # Verify
-kubectl get secret gcp-credentials
+kubectl get secret pubsub-credentials
 ```
 
-**Note:** Kafka bootstrap servers and credentials come from Confluent Cloud (external service). Get them from:
-1. Confluent Cloud UI: https://confluent.cloud
-2. Your `terraform.tfvars` file (if you saved them there)
+**Important:** The base64 string from Terraform is the raw service-account key. Store it securely (password manager or secret manager) and rotate it if leaked. Never commit the decoded JSON to Git.
 
 ### 4.3 Create Application ConfigMap
 
@@ -418,9 +422,17 @@ cd ../aws
 LAMBDA_URL=$(terraform output -raw api_gateway_url)
 echo "Lambda URL: $LAMBDA_URL"
 
-# Create ConfigMap
+# Create ConfigMap (lambda URL + Pub/Sub metadata)
+PUBSUB_PROJECT_ID=$(terraform -chdir=../gcp output -raw gcp_project_id 2>/dev/null || echo "careful-cosine-478715-a0")
+PUBSUB_RIDES_TOPIC=$(cat ../../outputs/pubsub_rides_topic.txt)
+PUBSUB_RESULTS_TOPIC=$(cat ../../outputs/pubsub_results_topic.txt)
+
 kubectl create configmap app-config \
-  --from-literal=lambda_api_url="${LAMBDA_URL}"
+  --from-literal=lambda_api_url="${LAMBDA_URL}" \
+  --from-literal=pubsub_project_id="${PUBSUB_PROJECT_ID}" \
+  --from-literal=pubsub_rides_topic="${PUBSUB_RIDES_TOPIC}" \
+  --from-literal=pubsub_results_topic="${PUBSUB_RESULTS_TOPIC}" \
+  --dry-run=client -o yaml | kubectl apply -f -
 
 # Verify
 kubectl get configmap app-config
@@ -717,11 +729,11 @@ gcloud dataproc clusters ssh $CLUSTER_NAME --region=$REGION --zone=$ZONE
 # Download JAR from GCS
 gsutil cp gs://${CLUSTER_NAME}-flink-jobs/ride-analytics-1.0.jar /tmp/
 
-# Get Kafka credentials from Kubernetes secret (or set manually)
-# Note: You'll need to set these environment variables
-export KAFKA_BOOTSTRAP_SERVERS="<from-terraform-output-or-secret>"
-export KAFKA_API_KEY="<from-terraform-output-or-secret>"
-export KAFKA_API_SECRET="<from-terraform-output-or-secret>"
+# Export Pub/Sub environment variables (from Phase 2 outputs)
+export PUBSUB_PROJECT_ID="careful-cosine-478715-a0"                # From terraform.tfvars
+export PUBSUB_RIDES_SUBSCRIPTION="<pubsub_rides_subscription>"      # From terraform output
+export PUBSUB_RESULTS_TOPIC="<pubsub_results_topic>"                # From terraform output
+export FIRESTORE_COLLECTION="ride_analytics"
 
 # Submit Flink job
 /opt/flink/bin/flink run \
@@ -764,7 +776,7 @@ tail -f /opt/flink/log/flink-*-taskmanager-*.log
 3. Check "Jobs" tab for running jobs
 4. View logs in Cloud Logging
 
-**✅ Expected:** Flink job running, consuming from Confluent Cloud Kafka, writing to Firestore
+**✅ Expected:** Flink job running, consuming from Pub/Sub (`rides` subscription) and writing to Pub/Sub (`ride-results`) + Firestore
 
 ---
 
@@ -904,42 +916,40 @@ aws lambda invoke \
 cat response.json
 ```
 
-### 9.4 Check Confluent Cloud Kafka
+### 9.4 Check Cloud Pub/Sub
 
 ```bash
-# Via Confluent Cloud UI
-echo "Check Kafka at: https://confluent.cloud"
+cd infra/gcp
+PUBSUB_PROJECT_ID=$(terraform output -raw gcp_project_id)
+PUBSUB_RIDES_TOPIC=$(terraform output -raw pubsub_rides_topic)
+PUBSUB_RIDES_SUBSCRIPTION=$(terraform output -raw pubsub_rides_subscription)
+PUBSUB_RESULTS_TOPIC=$(terraform output -raw pubsub_results_topic)
 
-# List topics via Confluent CLI (if installed)
-confluent kafka topic list
+# List topics
+gcloud pubsub topics list --project $PUBSUB_PROJECT_ID
 
-# Check topic details
-confluent kafka topic describe rides
-confluent kafka topic describe ride-results
+# Describe rides topic
+gcloud pubsub topics describe $PUBSUB_RIDES_TOPIC --project $PUBSUB_PROJECT_ID
 
-# Check consumer groups
-confluent kafka consumer list
-```
+# Peek messages waiting for Flink (should drain quickly)
+gcloud pubsub subscriptions pull $PUBSUB_RIDES_SUBSCRIPTION \
+  --project $PUBSUB_PROJECT_ID \
+  --auto-ack \
+  --limit=5
 
-**Via kcat (Kafka cat):**
-```bash
-# Check Kafka connectivity
-kcat -b $KAFKA_BOOTSTRAP \
-  -X security.protocol=SASL_SSL \
-  -X sasl.mechanism=PLAIN \
-  -X sasl.username=$KAFKA_API_KEY \
-  -X sasl.password=$KAFKA_API_SECRET \
-  -L
+# Create a temporary subscription to inspect aggregated results
+TEMP_SUB="ride-results-debug-$RANDOM"
+gcloud pubsub subscriptions create $TEMP_SUB \
+  --topic=$PUBSUB_RESULTS_TOPIC \
+  --project=$PUBSUB_PROJECT_ID \
+  --expiration-period=86400s
 
-# Consume from rides topic
-kcat -b $KAFKA_BOOTSTRAP \
-  -X security.protocol=SASL_SSL \
-  -X sasl.mechanism=PLAIN \
-  -X sasl.username=$KAFKA_API_KEY \
-  -X sasl.password=$KAFKA_API_SECRET \
-  -t rides \
-  -C \
-  -c 5
+gcloud pubsub subscriptions pull $TEMP_SUB \
+  --project $PUBSUB_PROJECT_ID \
+  --auto-ack \
+  --limit=5
+
+gcloud pubsub subscriptions delete $TEMP_SUB --project $PUBSUB_PROJECT_ID
 ```
 
 ### 9.5 Check Firestore (NoSQL Database)
@@ -1109,8 +1119,8 @@ This test validates 5 components simultaneously:
 1. ✅ Ride Service (stores in RDS)
 2. ✅ Payment Service (processes payment)
 3. ✅ Lambda Function (sends notification)
-4. ✅ Confluent Kafka (receives event)
-5. ✅ Flink Job on Dataproc (processes stream)
+4. ✅ Cloud Pub/Sub (`rides` topic receives event)
+5. ✅ Flink Job on Dataproc (processes stream + writes results)
 
 ```bash
 kubectl port-forward svc/ride-service 8003:80
@@ -1149,33 +1159,40 @@ aws logs tail /aws/lambda/ride-booking-notification-lambda --follow --since 5m
 ```
 **✅ Expected:** Log entry showing ride notification
 
-**C. Check Kafka Metrics (Confluent Cloud):**
+**C. Check Pub/Sub Metrics:**
 
-**Via Confluent Cloud UI:**
-1. Login to https://confluent.cloud
-2. Go to your cluster → Topics
-3. Click on `rides` topic
-4. Check "Messages" tab to see incoming messages
-5. Check "Consumers" tab to see Flink consumer group
-
-**Via CLI:**
 ```bash
-# Install kcat (kafka cat) for testing
-brew install kcat  # macOS
-# Or: https://github.com/edenhill/kcat
+cd infra/gcp
+PROJECT_ID=$(terraform output -raw gcp_project_id)
+RIDES_TOPIC=$(terraform output -raw pubsub_rides_topic)
+RIDES_SUB=$(terraform output -raw pubsub_rides_subscription)
+RESULTS_TOPIC=$(terraform output -raw pubsub_results_topic)
 
-# Consume messages from rides topic
-kcat -b $KAFKA_BOOTSTRAP \
-  -X security.protocol=SASL_SSL \
-  -X sasl.mechanism=PLAIN \
-  -X sasl.username=$KAFKA_API_KEY \
-  -X sasl.password=$KAFKA_API_SECRET \
-  -t rides \
-  -C \
-  -c 10
+# List topics
+gcloud pubsub topics list --project $PROJECT_ID
+
+# Pull a few ride events (should show JSON payloads)
+gcloud pubsub subscriptions pull $RIDES_SUB \
+  --project $PROJECT_ID \
+  --limit 5 \
+  --auto-ack
+
+# Create short-lived subscription to inspect ride-results
+TEMP_SUB="ride-results-debug-$RANDOM"
+gcloud pubsub subscriptions create $TEMP_SUB \
+  --topic $RESULTS_TOPIC \
+  --project $PROJECT_ID \
+  --expiration-period=3600s
+
+gcloud pubsub subscriptions pull $TEMP_SUB \
+  --project $PROJECT_ID \
+  --auto-ack \
+  --limit 5
+
+gcloud pubsub subscriptions delete $TEMP_SUB --project $PROJECT_ID
 ```
 
-**✅ Expected:** Messages appearing in Kafka topic
+**✅ Expected:** Messages appear in Pub/Sub `rides` topic and aggregated JSON documents appear in `ride-results`.
 
 **D. Check Flink Job Status (Dataproc):**
 
@@ -1199,7 +1216,7 @@ gcloud dataproc jobs wait $JOB_ID --region=$REGION
 2. Open http://localhost:8081
 3. View running jobs and metrics
 
-**✅ Expected:** Flink job running and processing events from Kafka
+**✅ Expected:** Flink job running and processing events from Pub/Sub stream
 
 **E. Check Firestore (GCP Console):**
 
@@ -1469,40 +1486,42 @@ kubectl top nodes
 kubectl top pods
 ```
 
-### Issue: Confluent Kafka Connection Failed
+### Issue: Pub/Sub Connectivity Failed
 
-**Symptom:** Ride service or Flink job logs show Kafka connection errors
+**Symptom:** Ride service logs show `PermissionDenied` when publishing or Flink job can't pull messages from `rides` subscription.
 
 **Solution:**
 
 ```bash
-# Verify Kafka bootstrap servers
-kubectl get secret gcp-credentials -o jsonpath='{.data.kafka_bootstrap_servers}' | base64 -d
-echo ""
+cd infra/gcp
+PROJECT_ID=$(terraform output -raw gcp_project_id)
+RIDES_TOPIC=$(terraform output -raw pubsub_rides_topic)
+RIDES_SUB=$(terraform output -raw pubsub_rides_subscription)
+RESULTS_TOPIC=$(terraform output -raw pubsub_results_topic)
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 
-# Verify API credentials
-kubectl get secret gcp-credentials -o jsonpath='{.data.kafka_api_key}' | base64 -d
-echo ""
+# Ensure Pub/Sub API enabled
+gcloud services enable pubsub.googleapis.com --project $PROJECT_ID
 
-# Test Kafka connectivity using kcat
-kcat -b $KAFKA_BOOTSTRAP \
-  -X security.protocol=SASL_SSL \
-  -X sasl.mechanism=PLAIN \
-  -X sasl.username=$KAFKA_API_KEY \
-  -X sasl.password=$KAFKA_API_SECRET \
-  -L
+# Reapply IAM bindings
+gcloud pubsub subscriptions add-iam-policy-binding $RIDES_SUB \
+  --project=$PROJECT_ID \
+  --member="serviceAccount:${COMPUTE_SA}" \
+  --role="roles/pubsub.subscriber"
 
-# Verify topic exists in Confluent Cloud UI
-echo "Check topics at: https://confluent.cloud"
+gcloud pubsub topics add-iam-policy-binding $RESULTS_TOPIC \
+  --project=$PROJECT_ID \
+  --member="serviceAccount:${COMPUTE_SA}" \
+  --role="roles/pubsub.publisher"
 
-# Test producing a message
-echo "test message" | kcat -b $KAFKA_BOOTSTRAP \
-  -X security.protocol=SASL_SSL \
-  -X sasl.mechanism=PLAIN \
-  -X sasl.username=$KAFKA_API_KEY \
-  -X sasl.password=$KAFKA_API_SECRET \
-  -t rides \
-  -P
+# Publish a test event
+gcloud pubsub topics publish $RIDES_TOPIC \
+  --project=$PROJECT_ID \
+  --message '{"ride_id":123,"city":"debug","timestamp":"'$(date -Iseconds)'"}'
+
+# Pull from subscription to confirm delivery
+gcloud pubsub subscriptions pull $RIDES_SUB --project=$PROJECT_ID --auto-ack --limit=5
 ```
 
 ### Issue: Lambda Not Triggering
@@ -1618,12 +1637,11 @@ Before recording your demo video, verify:
 - [ ] Grafana dashboard accessible and showing metrics
 - [ ] Prometheus collecting metrics from all services
 - [ ] Lambda function working and logging to CloudWatch
-- [ ] Confluent Cloud Kafka cluster running (created manually at https://confluent.cloud)
-- [ ] Kafka topics created (`rides`, `ride-results`) in Confluent Cloud
-- [ ] Kafka API keys created and configured in Terraform
-- [ ] Kafka receiving events from ride service
+- [ ] Pub/Sub topics (`rides`, `ride-results`) created by Terraform
+- [ ] Pub/Sub publisher secret (`pubsub-credentials`) created in Kubernetes
+- [ ] Ride service publishing events to Pub/Sub (`rides` topic)
 - [ ] Flink job running on Google Dataproc
-- [ ] Flink consuming from Confluent Cloud Kafka and processing streams
+- [ ] Flink consuming from Pub/Sub subscription and writing to `ride-results` + Firestore
 - [ ] Firestore storing analytics results from Flink
 - [ ] Frontend accessible and all pages working
 - [ ] User registration and login working
@@ -1713,7 +1731,6 @@ cd ../aws
 terraform destroy
 # Type 'yes' when prompted
 
-# Note: Manually delete Confluent Cloud Kafka cluster from https://confluent.cloud
 # Note: Firestore database deletion may take time - check GCP Console
 ```
 
@@ -1723,7 +1740,7 @@ terraform destroy
 
 - **AWS EKS Documentation**: https://docs.aws.amazon.com/eks/
 - **Google Dataproc Documentation**: https://cloud.google.com/dataproc/docs
-- **Confluent Cloud Documentation**: https://docs.confluent.io/cloud/
+- **Cloud Pub/Sub Documentation**: https://cloud.google.com/pubsub/docs
 - **ArgoCD Documentation**: https://argo-cd.readthedocs.io/
 - **Prometheus Documentation**: https://prometheus.io/docs/
 - **Grafana Documentation**: https://grafana.com/docs/
@@ -1740,7 +1757,7 @@ If you encounter issues not covered in this guide:
 3. Review Terraform outputs: `terraform output`
 4. Check AWS CloudWatch logs for Lambda
 5. Check GCP Console for Dataproc and Firestore metrics
-6. Check Confluent Cloud UI for Kafka metrics
+6. Check Cloud Pub/Sub metrics in GCP Console
 
 ---
 

@@ -13,9 +13,5 @@ dataproc_num_workers  = 2
 # Firestore Configuration
 firestore_location = "asia-south1"  # Mumbai, India
 
-# Confluent Cloud Kafka Configuration
-# Get these from: https://confluent.cloud
-kafka_bootstrap_servers = "pkc-xxxxx.region.provider.confluent.cloud:9092"
-kafka_api_key           = "your-confluent-api-key"
-kafka_api_secret        = "your-confluent-api-secret"
+# Pub/Sub (managed by Terraform, no manual config required)
 

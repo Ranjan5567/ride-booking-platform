@@ -4,8 +4,11 @@ import psycopg2
 import os
 import httpx
 import json
+import base64
 from typing import Optional
 import uvicorn
+from google.cloud import pubsub_v1
+from google.oauth2 import service_account
 
 app = FastAPI(title="Ride Service", version="1.0.0")
 
@@ -19,8 +22,13 @@ DB_PORT = os.getenv("DB_PORT", "5432")
 # Service URLs
 PAYMENT_SERVICE_URL = os.getenv("PAYMENT_SERVICE_URL", "http://payment-service:8004")
 LAMBDA_API_URL = os.getenv("LAMBDA_API_URL", "")
-EVENTHUB_CONNECTION_STRING = os.getenv("EVENTHUB_CONNECTION_STRING", "")
+PUBSUB_PROJECT_ID = os.getenv("PUBSUB_PROJECT_ID", "")
+PUBSUB_RIDES_TOPIC = os.getenv("PUBSUB_RIDES_TOPIC", "")
+PUBSUB_CREDENTIALS_B64 = os.getenv("PUBSUB_PUBLISHER_CREDENTIALS", "")
 DISABLE_NOTIFICATIONS = os.getenv("DISABLE_NOTIFICATIONS", "false").lower() == "true"
+
+pubsub_publisher = None
+PUBSUB_TOPIC_PATH = None
 
 def get_db_connection():
     return psycopg2.connect(
@@ -70,27 +78,53 @@ async def startup():
     cursor.close()
     conn.close()
 
-async def publish_to_eventhub(ride_data: dict):
-    """Publish ride event to Azure Event Hub"""
+    init_pubsub()
+
+def init_pubsub():
+    """Initialize Pub/Sub publisher client"""
+    global pubsub_publisher, PUBSUB_TOPIC_PATH
+
+    if not PUBSUB_PROJECT_ID or not PUBSUB_RIDES_TOPIC:
+        print("Pub/Sub configuration missing, skipping publisher init")
+        return
+
+    credentials = None
+    if PUBSUB_CREDENTIALS_B64:
+        try:
+            credentials_json = base64.b64decode(PUBSUB_CREDENTIALS_B64).decode("utf-8")
+            credentials_info = json.loads(credentials_json)
+            credentials = service_account.Credentials.from_service_account_info(credentials_info)
+        except Exception as exc:
+            print(f"Unable to parse Pub/Sub credentials: {exc}")
+
     try:
-        from azure.eventhub import EventHubProducerClient, EventData
-        
-        if not EVENTHUB_CONNECTION_STRING:
-            print("EventHub connection string not configured, skipping event publish")
-            return
-        
-        producer = EventHubProducerClient.from_connection_string(
-            conn_str=EVENTHUB_CONNECTION_STRING,
-            eventhub_name="rides"
+        pubsub_publisher = pubsub_v1.PublisherClient(credentials=credentials)
+        PUBSUB_TOPIC_PATH = pubsub_publisher.topic_path(PUBSUB_PROJECT_ID, PUBSUB_RIDES_TOPIC)
+        print(f"Configured Pub/Sub publisher for topic {PUBSUB_TOPIC_PATH}")
+    except Exception as exc:
+        print(f"Failed to initialize Pub/Sub publisher: {exc}")
+        pubsub_publisher = None
+        PUBSUB_TOPIC_PATH = None
+
+async def publish_to_pubsub(ride_data: dict):
+    """Publish ride event to Google Pub/Sub"""
+    global pubsub_publisher, PUBSUB_TOPIC_PATH
+
+    if not pubsub_publisher or not PUBSUB_TOPIC_PATH:
+        print("Pub/Sub publisher not configured, skipping publish")
+        return
+
+    try:
+        future = pubsub_publisher.publish(
+            PUBSUB_TOPIC_PATH,
+            json.dumps(ride_data).encode("utf-8"),
+            city=ride_data.get("city", "unknown")
         )
-        
-        with producer:
-            event_data = EventData(json.dumps(ride_data))
-            producer.send_batch([event_data])
-            print(f"Published ride event: {ride_data}")
+        future.result(timeout=10)
+        print(f"Published ride event to Pub/Sub: {ride_data}")
     except Exception as e:
-        print(f"Error publishing to EventHub: {str(e)}")
-        # Don't fail the request if EventHub is unavailable
+        print(f"Error publishing to Pub/Sub: {str(e)}")
+        # Don't fail the request if Pub/Sub is unavailable
 
 async def call_notification_lambda(ride_id: int, city: str):
     """Call notification Lambda via API Gateway"""
@@ -157,7 +191,7 @@ async def start_ride(ride: RideStart):
             "city": ride.city,
             "timestamp": created_at.isoformat()
         }
-        await publish_to_eventhub(ride_event)
+        await publish_to_pubsub(ride_event)
         
         return {
             "message": "Ride started successfully",

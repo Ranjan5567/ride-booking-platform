@@ -50,11 +50,21 @@ spec:
             configMapKeyRef:
               name: app-config
               key: lambda_api_url
-        - name: EVENTHUB_CONNECTION_STRING
+        - name: PUBSUB_PROJECT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: pubsub_project_id
+        - name: PUBSUB_RIDES_TOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: pubsub_rides_topic
+        - name: PUBSUB_PUBLISHER_CREDENTIALS
           valueFrom:
             secretKeyRef:
-              name: azure-credentials
-              key: eventhub_connection_string
+              name: pubsub-credentials
+              key: publisher_sa.json
         - name: DISABLE_NOTIFICATIONS
           value: "false"
         resources:

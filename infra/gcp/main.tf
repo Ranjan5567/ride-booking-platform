@@ -25,13 +25,26 @@ resource "google_project_service" "required_apis" {
     "firestore.googleapis.com",
     "compute.googleapis.com",
     "storage-api.googleapis.com",
-    "storage-component.googleapis.com"
+    "storage-component.googleapis.com",
+    "pubsub.googleapis.com",
+    "iam.googleapis.com"
   ])
 
   project = var.gcp_project_id
   service = each.value
 
   disable_on_destroy = false
+}
+
+# Pub/Sub topics + IAM for ride events
+module "pubsub" {
+  source = "./modules/pubsub"
+
+  project_id   = var.gcp_project_id
+  project_name = var.project_name
+  region       = var.gcp_region
+
+  depends_on = [google_project_service.required_apis]
 }
 
 # Dataproc Cluster for Flink
@@ -45,11 +58,6 @@ module "dataproc" {
   machine_type    = var.dataproc_machine_type
   num_workers     = var.dataproc_num_workers
   project_name    = var.project_name
-
-  # Kafka configuration (Confluent Cloud)
-  kafka_bootstrap_servers = var.kafka_bootstrap_servers
-  kafka_api_key           = var.kafka_api_key
-  kafka_api_secret        = var.kafka_api_secret
 
   depends_on = [google_project_service.required_apis]
 }
