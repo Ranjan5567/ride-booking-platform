@@ -1,0 +1,1 @@
+﻿"https://8CB62D93F6F4A144F64F05C2C1300593.gr7.ap-south-1.eks.amazonaws.com"

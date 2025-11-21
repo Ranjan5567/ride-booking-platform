@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 set -e
 
 echo "=== Installing Apache Flink on Dataproc ==="
@@ -48,7 +48,7 @@ EOF
 # Download Flink Pub/Sub connector
 echo "Downloading Flink GCP Pub/Sub connector..."
 cd ${FLINK_HOME}/lib
-wget -q https://repo1.maven.org/maven2/org/apache/flink/flink-connector-gcp-pubsub/3.0.1-1.18/flink-connector-gcp-pubsub-3.0.1-1.18.jar
+wget -q --timeout=300 --tries=3 https://repo1.maven.org/maven2/org/apache/flink/flink-connector-gcp-pubsub/3.0.1-1.18/flink-connector-gcp-pubsub-3.0.1-1.18.jar || echo "Warning: Failed to download Pub/Sub connector, continuing..."
 
 # Set environment variables
 echo "export FLINK_HOME=${FLINK_HOME}" >> ~/.bashrc

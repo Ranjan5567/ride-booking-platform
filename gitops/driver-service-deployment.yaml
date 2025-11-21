@@ -14,10 +14,14 @@ spec:
     metadata:
       labels:
         app: driver-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8002"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
       - name: driver-service
-        image: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/user-service:latest
+        image: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/driver-service:latest
         ports:
         - containerPort: 8002
         env:
