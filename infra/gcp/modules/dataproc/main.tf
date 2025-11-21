@@ -27,18 +27,13 @@ resource "google_dataproc_cluster" "flink_cluster" {
       }
     }
 
-    # Software configuration
+    # Software configuration with built-in Flink component
     software_config {
-      image_version = "2.1-debian11"
+      image_version       = "2.2-debian12"
+      optional_components = ["FLINK"]
       override_properties = {
         "dataproc:dataproc.allow.zero.workers" = "false"
       }
-    }
-
-    # Initialization actions to install Flink
-    initialization_action {
-      script      = google_storage_bucket_object.flink_init_script.url
-      timeout_sec = 600
     }
 
     # GCE cluster configuration
@@ -80,25 +75,6 @@ resource "google_storage_bucket" "dataproc_staging" {
   }
 }
 
-# Storage bucket for Flink initialization script
-resource "google_storage_bucket" "flink_scripts" {
-  name          = "${var.project_id}-flink-scripts-${random_id.bucket_suffix.hex}"
-  location      = var.region
-  force_destroy = true
-
-  uniform_bucket_level_access = true
-
-  labels = {
-    environment = "dev"
-    purpose     = "flink-scripts"
-  }
-}
-
-# Flink initialization script
-resource "google_storage_bucket_object" "flink_init_script" {
-  name    = "init-flink.sh"
-  bucket  = google_storage_bucket.flink_scripts.name
-  content = file("${path.module}/scripts/init-flink.sh.tpl")
-  content_type = "text/x-shellscript"
-}
+# Note: Flink is now installed via Dataproc's built-in optional_components
+# No manual initialization script needed
 

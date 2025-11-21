@@ -86,9 +86,10 @@ gcloud auth login
 gcloud config set project careful-cosine-478715-a0
 
 # Enable required APIs
-gcloud services enable dataproc.googleapis.com
-gcloud services enable firestore.googleapis.com
-gcloud services enable compute.googleapis.com
+gcloud services enable dataproc.googleapis.com --project=careful-cosine-478715-a0
+gcloud services enable firestore.googleapis.com --project=careful-cosine-478715-a0
+gcloud services enable compute.googleapis.com --project=careful-cosine-478715-a0
+gcloud services enable pubsub.googleapis.com --project=careful-cosine-478715-a0
 gcloud services enable storage.googleapis.com
 gcloud services enable storage-api.googleapis.com
 gcloud services enable storage-component.googleapis.com
@@ -1764,4 +1765,3 @@ If you encounter issues not covered in this guide:
 **Good luck with your deployment! 🚀**
 
 Last Updated: November 2024
-

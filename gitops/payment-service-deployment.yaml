@@ -14,10 +14,14 @@ spec:
     metadata:
       labels:
         app: payment-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8004"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
       - name: payment-service
-        image: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/user-service:latest
+        image: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/payment-service:latest
         ports:
         - containerPort: 8004
         resources:

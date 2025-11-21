@@ -51,7 +51,7 @@ module "lambda" {
   source = "./modules/lambda"
   
   function_name = "${var.project_name}-notification-lambda"
-  handler       = "index.handler"
+  handler       = "function.lambda_handler"
   runtime       = "python3.11"
 }
 

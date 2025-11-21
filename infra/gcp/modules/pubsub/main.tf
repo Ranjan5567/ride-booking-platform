@@ -62,20 +62,20 @@ resource "google_pubsub_topic_iam_member" "rides_publisher_binding" {
 resource "google_pubsub_subscription_iam_member" "flink_subscription_binding" {
   subscription = google_pubsub_subscription.rides_flink.name
   role         = "roles/pubsub.subscriber"
-  member       = "serviceAccount:${locals.compute_default_sa}"
+  member       = "serviceAccount:${local.compute_default_sa}"
 }
 
 # Allow Dataproc (default compute SA) to publish aggregated events
 resource "google_pubsub_topic_iam_member" "flink_results_publisher" {
   topic  = google_pubsub_topic.ride_results.name
   role   = "roles/pubsub.publisher"
-  member = "serviceAccount:${locals.compute_default_sa}"
+  member = "serviceAccount:${local.compute_default_sa}"
 }
 
 # Allow Dataproc default SA to write analytics to Firestore
 resource "google_project_iam_member" "flink_firestore_user" {
   project = var.project_id
   role    = "roles/datastore.user"
-  member  = "serviceAccount:${locals.compute_default_sa}"
+  member  = "serviceAccount:${local.compute_default_sa}"
 }
 
