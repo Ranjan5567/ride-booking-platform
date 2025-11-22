@@ -69,6 +69,10 @@ spec:
             secretKeyRef:
               name: pubsub-credentials
               key: publisher_sa.json
+        - name: FIRESTORE_DATABASE
+          value: "ride-booking-analytics"
+        - name: FIRESTORE_COLLECTION
+          value: "ride_analytics"
         - name: DISABLE_NOTIFICATIONS
           value: "false"
         resources:

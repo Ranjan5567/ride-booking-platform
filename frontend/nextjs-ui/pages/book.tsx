@@ -14,7 +14,7 @@ export default function BookRide() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8003'
+  const RIDE_API = process.env.NEXT_PUBLIC_RIDE_API_URL || 'http://localhost:8003'
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -31,7 +31,7 @@ export default function BookRide() {
     setMessage('')
 
     try {
-      const response = await axios.post(`${API_BASE}/ride/start`, {
+      const response = await axios.post(`${RIDE_API}/ride/start`, {
         rider_id: user.id,
         driver_id: formData.driver_id,
         pickup: formData.pickup,

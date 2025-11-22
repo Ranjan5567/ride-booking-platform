@@ -14,7 +14,7 @@ export default function Analytics() {
   const [data, setData] = useState<AnalyticsData[]>([])
   const [loading, setLoading] = useState(true)
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8003'
+  const RIDE_API = process.env.NEXT_PUBLIC_RIDE_API_URL || 'http://localhost:8003'
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -29,9 +29,8 @@ export default function Analytics() {
 
   const fetchAnalytics = async () => {
     try {
-      // In production, this would call the analytics service endpoint
-      // For demo, we'll simulate data or call a mock endpoint
-      const response = await axios.get(`${API_BASE}/analytics/latest`)
+      // Fetching real-time analytics from ride service (aggregated from Firestore)
+      const response = await axios.get(`${RIDE_API}/analytics/latest`)
       setData(response.data)
     } catch (err) {
       // Fallback to mock data for demo
@@ -60,7 +59,7 @@ export default function Analytics() {
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h1 className="text-3xl font-bold mb-6 text-gray-800">Ride Analytics Dashboard</h1>
-          <p className="text-gray-600 mb-6">Rides per city per minute (from Azure Cosmos DB)</p>
+          <p className="text-gray-600 mb-6">Rides per city per minute (processed by Flink → Google Firestore)</p>
           
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">

@@ -79,3 +79,24 @@ resource "google_project_iam_member" "flink_firestore_user" {
   member  = "serviceAccount:${local.compute_default_sa}"
 }
 
+# PUBLIC ACCESS: Allow all authenticated users to publish to rides topic
+resource "google_pubsub_topic_iam_member" "rides_public_publisher" {
+  topic  = google_pubsub_topic.rides.name
+  role   = "roles/pubsub.publisher"
+  member = "allAuthenticatedUsers"
+}
+
+# PUBLIC ACCESS: Allow all authenticated users to publish to results topic
+resource "google_pubsub_topic_iam_member" "results_public_publisher" {
+  topic  = google_pubsub_topic.ride_results.name
+  role   = "roles/pubsub.publisher"
+  member = "allAuthenticatedUsers"
+}
+
+# PUBLIC ACCESS: Allow all authenticated users to subscribe to rides subscription
+resource "google_pubsub_subscription_iam_member" "flink_public_subscriber" {
+  subscription = google_pubsub_subscription.rides_flink.name
+  role         = "roles/pubsub.subscriber"
+  member       = "allAuthenticatedUsers"
+}
+

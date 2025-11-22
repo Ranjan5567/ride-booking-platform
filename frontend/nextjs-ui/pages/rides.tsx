@@ -18,7 +18,7 @@ export default function MyRides() {
   const [rides, setRides] = useState<Ride[]>([])
   const [loading, setLoading] = useState(true)
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8003'
+  const RIDE_API = process.env.NEXT_PUBLIC_RIDE_API_URL || 'http://localhost:8003'
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -31,7 +31,7 @@ export default function MyRides() {
 
   const fetchRides = async () => {
     try {
-      const response = await axios.get(`${API_BASE}/ride/all`)
+      const response = await axios.get(`${RIDE_API}/ride/all`)
       setRides(response.data)
     } catch (err) {
       console.error('Failed to fetch rides:', err)

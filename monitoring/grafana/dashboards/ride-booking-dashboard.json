@@ -1,48 +1,115 @@
 {
-  "dashboard": {
-    "title": "Ride Booking Platform Dashboard",
-    "panels": [
-      {
-        "title": "CPU Usage - Ride Service",
-        "targets": [
-          {
-            "expr": "rate(container_cpu_usage_seconds_total{pod=~\"ride-service.*\"}[5m])",
-            "legendFormat": "{{pod}}"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "HPA Pod Count - Ride Service",
-        "targets": [
-          {
-            "expr": "kube_deployment_status_replicas{deployment=\"ride-service\"}",
-            "legendFormat": "Replicas"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Request Rate",
-        "targets": [
-          {
-            "expr": "rate(http_requests_total[5m])",
-            "legendFormat": "{{service}}"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Error Rate",
-        "targets": [
-          {
-            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
-            "legendFormat": "{{service}}"
-          }
-        ],
-        "type": "graph"
-      }
-    ]
-  }
-}
+  "uid": "ride-dashboard",
+  "title": "Ride Booking Platform Dashboard",
+  "schemaVersion": 27,
+  "version": 2,
+  "refresh": "30s",
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "CPU Usage - Ride Service",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
 
+      "lines": true,
+      "points": false,
+      "linewidth": 2,
+
+      "targets": [
+        {
+          "expr": "rate(container_cpu_usage_seconds_total{pod=~\"ride-service.*\", container!=\"POD\"}[2m]) * 100",
+          "legendFormat": "{{pod}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        { "format": "percent", "label": "CPU %" },
+        { "format": "short" }
+      ],
+      "xaxis": { "mode": "time" },
+
+      "interval": "10s",
+      "maxDataPoints": 500
+    },
+
+    {
+      "id": 2,
+      "title": "HPA Pod Count - Ride Service",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+
+      "lines": true,
+      "points": false,
+      "linewidth": 2,
+
+      "targets": [
+        {
+          "expr": "kube_deployment_status_replicas{deployment=\"ride-service\"}",
+          "legendFormat": "Replicas",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        { "format": "short", "label": "Pods" },
+        { "format": "short" }
+      ],
+      "xaxis": { "mode": "time" },
+      "interval": "10s"
+    },
+
+    {
+      "id": 3,
+      "title": "Request Rate (All Services)",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+
+      "lines": true,
+      "points": false,
+      "linewidth": 2,
+
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[2m])) by (service)",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        { "format": "reqps", "label": "Requests/sec" },
+        { "format": "short" }
+      ],
+      "xaxis": { "mode": "time" },
+      "interval": "10s"
+    },
+
+    {
+      "id": 4,
+      "title": "Error Rate (5xx)",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+
+      "lines": true,
+      "points": false,
+      "linewidth": 2,
+
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[2m])) by (service)",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [
+        { "format": "reqps", "label": "Errors/sec" },
+        { "format": "short" }
+      ],
+      "xaxis": { "mode": "time" },
+      "interval": "10s"
+    }
+  ]
+}

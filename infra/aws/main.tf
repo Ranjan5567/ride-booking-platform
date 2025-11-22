@@ -41,7 +41,7 @@ module "rds" {
   db_username = var.db_username
   db_password = var.db_password
   vpc_id      = module.vpc.vpc_id
-  subnet_ids  = module.vpc.private_subnet_ids
+  subnet_ids  = module.vpc.private_subnet_ids  # Keep in private subnets but make publicly accessible
   
   depends_on = [module.vpc]
 }

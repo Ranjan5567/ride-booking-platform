@@ -9,7 +9,9 @@ import base64
 from typing import Optional
 import uvicorn
 from google.cloud import pubsub_v1
+from google.cloud import firestore
 from google.oauth2 import service_account
+from collections import defaultdict
 
 app = FastAPI(title="Ride Service", version="1.0.0")
 
@@ -286,16 +288,75 @@ async def get_ride(ride_id: int):
 
 @app.get("/analytics/latest")
 async def get_analytics():
-    """Get latest analytics data (mock endpoint - in production would query Cosmos DB)"""
-    # In production, this would query Cosmos DB
-    # For demo, return mock data
-    return [
-        {"city": "Bangalore", "count": 45, "timestamp": "2024-01-15T10:30:00Z"},
-        {"city": "Mumbai", "count": 32, "timestamp": "2024-01-15T10:30:00Z"},
-        {"city": "Delhi", "count": 28, "timestamp": "2024-01-15T10:30:00Z"},
-        {"city": "Hyderabad", "count": 15, "timestamp": "2024-01-15T10:30:00Z"},
-        {"city": "Chennai", "count": 12, "timestamp": "2024-01-15T10:30:00Z"},
-    ]
+    """Get latest analytics data from Firestore"""
+    try:
+        # Get Firestore configuration from environment
+        firestore_project_id = os.getenv("PUBSUB_PROJECT_ID", "careful-cosine-478715-a0")
+        firestore_database = os.getenv("FIRESTORE_DATABASE", "ride-booking-analytics")
+        firestore_collection = os.getenv("FIRESTORE_COLLECTION", "ride_analytics")
+        
+        # Initialize Firestore client with credentials if available
+        credentials = None
+        if PUBSUB_CREDENTIALS_B64:
+            try:
+                credentials_json = base64.b64decode(PUBSUB_CREDENTIALS_B64).decode("utf-8")
+                credentials_info = json.loads(credentials_json)
+                from google.oauth2 import service_account
+                credentials = service_account.Credentials.from_service_account_info(credentials_info)
+            except Exception as cred_error:
+                print(f"Warning: Could not parse credentials for Firestore: {cred_error}")
+        
+        if credentials:
+            db = firestore.Client(project=firestore_project_id, database=firestore_database, credentials=credentials)
+        else:
+            # Try without explicit credentials (use default)
+            db = firestore.Client(project=firestore_project_id, database=firestore_database)
+        
+        # Query all documents from ride_analytics collection
+        docs = list(db.collection(firestore_collection).stream())
+        
+        if not docs:
+            # Return empty array if no data
+            return []
+        
+        # Aggregate by city (sum all counts per city)
+        city_aggregates = defaultdict(int)
+        latest_timestamps = {}
+        
+        for doc in docs:
+            data = doc.to_dict()
+            city = data.get("city", "unknown")
+            count = data.get("count", 0)
+            timestamp = data.get("timestamp", "")
+            
+            # Sum counts per city
+            city_aggregates[city] += count
+            
+            # Track latest timestamp per city
+            if city not in latest_timestamps or timestamp > latest_timestamps[city]:
+                latest_timestamps[city] = timestamp
+        
+        # Convert to list format expected by frontend
+        result = [
+            {
+                "city": city,
+                "count": total_count,
+                "timestamp": latest_timestamps.get(city, "")
+            }
+            for city, total_count in sorted(city_aggregates.items(), key=lambda x: x[1], reverse=True)
+        ]
+        
+        return result
+        
+    except Exception as e:
+        # Fallback to mock data if Firestore query fails
+        import traceback
+        print(f"Error querying Firestore: {e}")
+        traceback.print_exc()
+        return [
+            {"city": "Mumbai", "count": 0, "timestamp": ""},
+            {"city": "Delhi", "count": 0, "timestamp": ""},
+        ]
 
 @app.get("/health")
 async def health():

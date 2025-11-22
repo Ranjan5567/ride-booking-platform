@@ -24,7 +24,8 @@ class RideAnalyticsProcessor:
         # Initialize clients
         self.subscriber = pubsub_v1.SubscriberClient()
         self.publisher = pubsub_v1.PublisherClient()
-        self.db = firestore.Client(project=project_id)
+        # Specify the database name explicitly
+        self.db = firestore.Client(project=project_id, database='ride-booking-analytics')
         
         # Subscription path
         self.subscription_path = self.subscriber.subscription_path(

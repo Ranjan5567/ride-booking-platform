@@ -5,7 +5,8 @@ resource "google_dataproc_cluster" "flink_cluster" {
   region   = var.region
 
   cluster_config {
-    staging_bucket = google_storage_bucket.dataproc_staging.name
+    # Let Dataproc use default buckets to avoid permission issues
+    # staging_bucket = google_storage_bucket.dataproc_staging.name
 
     # Master node configuration
     master_config {
@@ -46,7 +47,17 @@ resource "google_dataproc_cluster" "flink_cluster" {
       service_account_scopes = [
         "https://www.googleapis.com/auth/cloud-platform"
       ]
+      # Enable external IPs for internet access (required for pip installs)
+      internal_ip_only = false
     }
+
+    # Initialization actions to install Python packages
+    # Note: Temporarily disabled - packages will be installed manually after cluster creation
+    # This avoids timeout issues during cluster creation
+    # initialization_action {
+    #   script      = "gs://${google_storage_bucket.dataproc_staging.name}/init-scripts/init_install_packages.sh"
+    #   timeout_sec = 900
+    # }
   }
 
   labels = {
@@ -75,6 +86,29 @@ resource "google_storage_bucket" "dataproc_staging" {
   }
 }
 
-# Note: Flink is now installed via Dataproc's built-in optional_components
-# No manual initialization script needed
+# Grant compute service account access to staging bucket
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+locals {
+  compute_sa = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
+resource "google_storage_bucket_iam_member" "compute_sa_staging_access" {
+  bucket = google_storage_bucket.dataproc_staging.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${local.compute_sa}"
+}
+
+# Grant compute service account storage admin on project level for temp buckets
+resource "google_project_iam_member" "compute_sa_storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${local.compute_sa}"
+}
+
+# Note: Initialization script should be uploaded manually to GCS
+# The script is already at: gs://${google_storage_bucket.dataproc_staging.name}/init-scripts/init_install_packages.sh
+# We upload it manually because Terraform path resolution from module is complex on Windows
 

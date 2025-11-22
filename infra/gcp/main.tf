@@ -27,13 +27,25 @@ resource "google_project_service" "required_apis" {
     "storage-api.googleapis.com",
     "storage-component.googleapis.com",
     "pubsub.googleapis.com",
-    "iam.googleapis.com"
+    "iam.googleapis.com",
+    "cloudresourcemanager.googleapis.com"
   ])
 
   project = var.gcp_project_id
   service = each.value
 
   disable_on_destroy = false
+}
+
+# Networking: Cloud NAT and Firewall Rules for Public Internet Access
+module "networking" {
+  source = "./modules/networking"
+
+  project_id   = var.gcp_project_id
+  project_name = var.project_name
+  region       = var.gcp_region
+
+  depends_on = [google_project_service.required_apis]
 }
 
 # Pub/Sub topics + IAM for ride events
