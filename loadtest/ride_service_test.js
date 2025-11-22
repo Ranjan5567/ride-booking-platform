@@ -18,7 +18,11 @@ export let options = {
   },
 };
 
-const BASE_URL = __ENV.RIDE_SERVICE_URL || 'http://ride-service:80';
+// Use localhost:8003 directly (port-forward from kubectl)
+const BASE_URL = __ENV.RIDE_SERVICE_URL || 'http://localhost:8003';
+
+// Log the URL being used
+console.log(`[k6] Using BASE_URL: ${BASE_URL}`);
 
 export default function () {
   // Generate random ride data
@@ -47,21 +51,46 @@ export default function () {
     },
   };
 
-  const response = http.post(`${BASE_URL}/ride/start`, payload, params);
+  const url = `${BASE_URL}/ride/start`;
+  const response = http.post(url, payload, params);
+  
+  // Log errors and some successes for debugging
+  if (response.status !== 200) {
+    console.log(`[k6] ERROR Request ${__ITER}: Status ${response.status}, URL: ${url}`);
+    console.log(`[k6] Error Body: ${response.body}`);
+  } else if (__ITER % 20 === 0) {
+    // Log every 20th success to show it's working
+    try {
+      const body = JSON.parse(response.body);
+      console.log(`[k6] Success Request ${__ITER}: Ride ID ${body.ride_id}`);
+    } catch (e) {
+      console.log(`[k6] Response: ${response.body}`);
+    }
+  }
   
   const success = check(response, {
     'status is 200': (r) => r.status === 200,
     'response has ride_id': (r) => {
       try {
         const body = JSON.parse(r.body);
-        return body.hasOwnProperty('ride_id');
+        const hasRideId = body.hasOwnProperty('ride_id');
+        if (!hasRideId) {
+          console.log(`[k6] ERROR: Missing ride_id in response: ${JSON.stringify(body)}`);
+        }
+        return hasRideId;
       } catch (e) {
+        console.log(`[k6] ERROR: JSON parse error: ${e}, Response: ${response.body}`);
         return false;
       }
     },
   });
 
-  errorRate.add(!success);
+  if (!success) {
+    errorRate.add(1);
+    console.log(`[k6] Request ${__ITER} FAILED checks`);
+  } else {
+    errorRate.add(0);
+  }
   
   sleep(1);
 }

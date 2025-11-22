@@ -17,12 +17,13 @@ All components of the Ride Booking Platform have been successfully created and o
 - ✅ S3 bucket
 - ✅ IAM roles and policies
 
-**Azure Infrastructure** (`infra/azure/`):
-- ✅ Resource Group
-- ✅ Event Hub namespace and topic
-- ✅ HDInsight Flink cluster
-- ✅ Cosmos DB account and database
-- ✅ Storage account for HDInsight
+**GCP Infrastructure** (`infra/gcp/`):
+- ✅ Dataproc cluster (Apache Flink)
+- ✅ Pub/Sub topic and subscription
+- ✅ Firestore database
+- ✅ Cloud Storage bucket
+- ✅ Cloud Router and Cloud NAT
+- ✅ IAM roles and service accounts
 
 ### Microservices (6 Total)
 
@@ -39,7 +40,8 @@ All components of the Ride Booking Platform have been successfully created and o
 3. **Ride Service** (`backend/ride-service/`)
    - FastAPI application
    - Main orchestration service
-   - Integrates with Payment, Lambda, and Confluent Cloud Kafka
+   - Integrates with Payment Service, Lambda, and Google Pub/Sub
+   - Publishes ride events to Pub/Sub for analytics
    - Dockerfile and requirements.txt included
 
 4. **Payment Service** (`backend/payment-service/`)
@@ -53,9 +55,11 @@ All components of the Ride Booking Platform have been successfully created and o
    - Logs notifications to CloudWatch
 
 6. **Analytics Service** (`analytics/flink-job/`)
-   - Apache Flink job (Java and Python versions)
-   - Stream processing from Confluent Cloud Kafka to Firestore
-   - Maven POM file included
+   - Apache Flink job (Python version)
+   - Stream processing from Google Pub/Sub to Firestore
+   - Runs on GCP Dataproc cluster
+   - Aggregates ride data by city with time windows
+   - Python script with installation scripts included
 
 ### Kubernetes Manifests
 
@@ -108,13 +112,13 @@ All components of the Ride Booking Platform have been successfully created and o
 |------------|--------|----------|
 | IaC (Terraform) | ✅ | `infra/aws/`, `infra/gcp/` |
 | 6 Microservices | ✅ | `backend/`, `infra/aws/modules/lambda/`, `analytics/` |
-| Multi-cloud | ✅ | AWS + GCP modules |
-| Serverless | ✅ | Lambda function |
-| Stream Processing | ✅ | Flink job |
+| Multi-cloud | ✅ | AWS (EKS, RDS, Lambda) + GCP (Dataproc, Pub/Sub, Firestore) |
+| Serverless | ✅ | AWS Lambda function |
+| Stream Processing | ✅ | Flink job on GCP Dataproc |
 | GitOps | ✅ | ArgoCD manifests |
-| HPA | ✅ | Kubernetes HPA configs |
-| Observability | ✅ | Prometheus + Grafana + Loki |
-| Distinct Storages | ✅ | RDS + Firestore + S3 |
+| HPA | ✅ | Kubernetes HPA configs (Ride Service) |
+| Observability | ✅ | Prometheus + Grafana |
+| Distinct Storages | ✅ | RDS (PostgreSQL) + Firestore (NoSQL) + S3 (Object) |
 | Load Testing | ✅ | k6 script |
 
 ## 📂 Complete Folder Structure
@@ -144,7 +148,9 @@ ride-booking-platform/
 │       ├── terraform.tfvars.example
 │       └── modules/
 │           ├── dataproc/
-│           └── firestore/
+│           ├── pubsub/
+│           ├── firestore/
+│           └── networking/
 ├── backend/
 │   ├── user-service/
 │   │   ├── app.py
@@ -164,9 +170,10 @@ ride-booking-platform/
 │       └── requirements.txt
 ├── analytics/
 │   └── flink-job/
-│       ├── src/main/java/com/ridebooking/RideAnalyticsJob.java
-│       ├── pom.xml
-│       └── python/ride_analytics.py
+│       └── python/
+│           ├── ride_analytics_standalone.py
+│           ├── install_and_run.sh
+│           └── init_install_packages.sh
 ├── gitops/
 │   ├── argocd-apps.yaml
 │   ├── user-service-deployment.yaml
@@ -210,7 +217,7 @@ ride-booking-platform/
 1. **Configure Terraform Variables**
    - Copy `terraform.tfvars.example` to `terraform.tfvars`
    - Fill in your AWS and GCP credentials
-   - Set up Confluent Cloud Kafka and get API keys
+   - Set up GCP service account with Pub/Sub and Firestore permissions
 
 2. **Deploy Infrastructure**
    ```bash
@@ -241,9 +248,11 @@ ride-booking-platform/
    - Build: `npm run build`
    - Deploy or run locally
 
-8. **Deploy Flink Job**
-   - Build Flink job: `mvn clean package`
-   - Upload to GCS and submit to Dataproc cluster
+8. **Deploy Flink Analytics Job**
+   - Upload Python script to Dataproc cluster
+   - Run initialization script to install dependencies
+   - Start analytics job on Dataproc master node
+   - Job processes Pub/Sub messages and writes to Firestore
 
 9. **Test End-to-End**
    - Register user
@@ -256,21 +265,25 @@ ride-booking-platform/
 
 - All services include health check endpoints (`/health`)
 - Lambda notifications can be disabled via `DISABLE_NOTIFICATIONS` env var
-- HPA is configured for Ride Service and User Service
-- Analytics endpoint includes mock data for demo purposes
+- HPA is configured for Ride Service (CPU threshold: 5%)
+- Analytics service aggregates ride data by city with 60-second windows
+- Frontend runs locally with port-forwarding to Kubernetes services
 - All infrastructure is production-ready but uses minimal instance sizes for cost optimization
+- RDS is publicly accessible for demo purposes
+- GCP Dataproc cluster has external IPs enabled for internet access
 
 ## ✨ Features
 
-- ✅ Complete Terraform infrastructure
-- ✅ 6 microservices (4 EKS + 1 Lambda + 1 Flink)
-- ✅ Multi-cloud architecture (AWS + GCP)
+- ✅ Complete Terraform infrastructure (AWS + GCP)
+- ✅ 6 microservices (4 EKS + 1 Lambda + 1 Flink on Dataproc)
+- ✅ Multi-cloud architecture (AWS for compute/DB, GCP for analytics)
 - ✅ GitOps with ArgoCD
-- ✅ Kubernetes autoscaling (HPA)
-- ✅ Comprehensive observability
-- ✅ Modern frontend with Next.js
-- ✅ Load testing capabilities
-- ✅ Complete documentation
+- ✅ Kubernetes autoscaling (HPA with Metrics Server)
+- ✅ Comprehensive observability (Prometheus + Grafana)
+- ✅ Modern frontend with Next.js (runs locally)
+- ✅ Load testing capabilities (k6)
+- ✅ Real-time analytics pipeline (Pub/Sub → Flink → Firestore)
+- ✅ Complete documentation and deployment guides
 
 ## 🎓 Academic Compliance
 

@@ -122,26 +122,3 @@ ORDER BY total_rides DESC;
 ```
 
 ---
-
-## 🔒 Security Note
-
-⚠️ **The RDS is now open to the internet (0.0.0.0/0)**
-
-This is for testing/demo purposes. In production:
-- Restrict security group to specific IPs
-- Use VPN or bastion host
-- Enable SSL/TLS only connections
-
----
-
-## ✅ Next Steps
-
-1. Open AWS Query Editor
-2. Connect to `ridebooking` database
-3. Run `SELECT * FROM users;` to verify data
-4. Create rides using Thunder Client
-5. Query rides table to see new data
-
-**Database is ready for your demo!** 🎉
-
-
