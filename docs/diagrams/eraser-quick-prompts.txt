@@ -1,0 +1,43 @@
+=== ERASER.IO QUICK PROMPTS ===
+Copy and paste these directly into Eraser.io
+
+---
+
+1. AWS INFRASTRUCTURE:
+"Create AWS architecture: EKS cluster with 4 microservices (User 8001, Driver 8002, Ride 8003 with HPA 2-10 pods, Payment 8004), RDS PostgreSQL, Lambda+API Gateway, S3, Prometheus/Grafana. Show connections. Use AWS orange colors."
+
+---
+
+2. GCP INFRASTRUCTURE:
+"Create GCP architecture: Dataproc cluster (Master + 2 Workers) with Flink, Pub/Sub topics (ride-booking-rides, ride-booking-ride-results), Firestore database (ride-booking-analytics), Cloud Storage. Show data flow. Use GCP blue colors."
+
+---
+
+3. CROSS-CLOUD FLOW:
+"Create flow diagram: AWS Ride Service → GCP Pub/Sub → Dataproc Flink → Firestore → AWS Ride Service → Frontend. Show AWS orange, GCP blue, label communication methods."
+
+---
+
+4. MICROSERVICES:
+"Create microservices diagram: Frontend (Next.js) connects to 4 services in EKS (User, Driver, Ride orchestrator, Payment). Ride Service calls Payment, Lambda, Pub/Sub, Firestore. Show all connections with protocols."
+
+---
+
+5. DATA FLOW:
+"Create sequence diagram: User → Frontend → Ride Service → RDS → Payment Service → Lambda → Pub/Sub → Flink → Firestore → Frontend. Show 16 steps with async operations marked."
+
+---
+
+6. DEPLOYMENT:
+"Create deployment diagram: Terraform (AWS + GCP modules) → Cloud Resources → Kubernetes EKS → ArgoCD GitOps → Application Services + Monitoring Stack. Show GitOps workflow."
+
+---
+
+7. SCALABILITY:
+"Create HPA diagram: Load Balancer → 3 Ride Service Pods → HPA Controller (5% CPU target) → Scale Up/Down decision. Show min 2, max 10 replicas, feedback loop."
+
+---
+
+8. HIGH-LEVEL OVERVIEW:
+"Create overview: Frontend → AWS (EKS, RDS, Lambda) and GCP (Dataproc, Pub/Sub, Firestore). Show cross-cloud connection. Use orange for AWS, blue for GCP."
+
