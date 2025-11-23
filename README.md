@@ -65,7 +65,7 @@ A fully functional ride booking platform demonstrating:
 ├── monitoring/                    # Observability
 │   └── grafana/                   # Grafana dashboards
 │
-└── loadtest/                      # Load testing scripts (k6)
+└── loadtest/                      # Load testing scripts
 ```
 
 ---
