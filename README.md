@@ -33,11 +33,7 @@ A fully functional ride booking platform demonstrating:
 
 ```
 .
-├── README.md                      # This file
-├── QUICKSTART.md                  # 30-minute deployment guide
-├── DEPLOYMENT.md                  # Comprehensive deployment instructions
-├── ARCHITECTURE_SUMMARY.md        # Architecture details & cost breakdown
-├── GCP_MIGRATION_SUMMARY.md       # GCP migration notes
+├── README.md
 │
 ├── backend/                       # Microservices (Python FastAPI)
 │   ├── user-service/              # User authentication & profiles
