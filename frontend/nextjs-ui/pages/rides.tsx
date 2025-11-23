@@ -1,3 +1,5 @@
+// My Rides Page - Displays ride history from RDS database
+// Fetches all rides from Ride Service which queries PostgreSQL
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import axios from 'axios'
@@ -18,6 +20,7 @@ export default function MyRides() {
   const [rides, setRides] = useState<Ride[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Connects to Ride Service API
   const RIDE_API = process.env.NEXT_PUBLIC_RIDE_API_URL || 'http://localhost:8003'
 
   useEffect(() => {
@@ -29,6 +32,7 @@ export default function MyRides() {
     fetchRides()
   }, [router])
 
+  // Fetches all rides from Ride Service - data comes from RDS PostgreSQL
   const fetchRides = async () => {
     try {
       const response = await axios.get(`${RIDE_API}/ride/all`)

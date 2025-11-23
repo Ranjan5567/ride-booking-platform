@@ -1,3 +1,5 @@
+# User Service Deployment - handles user registration and authentication
+# Managed by ArgoCD GitOps - deployed from this YAML file
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,7 +8,7 @@ metadata:
   labels:
     app: user-service
 spec:
-  replicas: 2
+  replicas: 2  # Fixed replica count (no HPA for this service)
   selector:
     matchLabels:
       app: user-service
@@ -15,6 +17,7 @@ spec:
       labels:
         app: user-service
       annotations:
+        # Prometheus metrics scraping - enables observability
         prometheus.io/scrape: "true"
         prometheus.io/port: "8001"
         prometheus.io/path: "/metrics"
@@ -25,6 +28,7 @@ spec:
         ports:
         - containerPort: 8001
         env:
+        # Database credentials from Kubernetes Secrets - RDS PostgreSQL connection
         - name: DB_HOST
           valueFrom:
             secretKeyRef:
@@ -55,6 +59,7 @@ spec:
             cpu: 500m
             memory: 512Mi
 ---
+# Kubernetes Service - internal service discovery for User Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -68,6 +73,7 @@ spec:
     targetPort: 8001
   type: ClusterIP
 ---
+# HPA for User Service - optional auto-scaling (not actively demonstrated in demo)
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:

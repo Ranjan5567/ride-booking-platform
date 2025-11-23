@@ -1,0 +1,20 @@
+graph TB
+    subgraph AWS["AWS Cloud (Primary)"]
+        subgraph EKS["Amazon EKS (Kubernetes Cluster)"]
+            US[User Service<br/>Port 8001]
+            DS[Driver Service<br/>Port 8002]
+            RS[Ride Service<br/>Port 8003<br/>HPA: 2-10 pods]
+            PS[Payment Service<br/>Port 8004]
+        end
+        
+        RDS[(RDS PostgreSQL<br/>users, drivers<br/>rides, payments)]
+        LAMBDA[Lambda + API Gateway<br/>Notification Service]
+        S3[(S3 Bucket<br/>Object Storage)]
+        
+        EKS --> RDS
+        RS --> LAMBDA
+    end
+    
+    style AWS fill:#FF9900,stroke:#232F3E,stroke-width:3px
+    style EKS fill:#F58536,stroke:#232F3E,stroke-width:2px
+    style RS fill:#FF6B6B,stroke:#232F3E,stroke-width:2px

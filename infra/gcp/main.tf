@@ -1,3 +1,7 @@
+# GCP Infrastructure as Code (IaC) - Terraform configuration
+# This file provisions all GCP resources: Dataproc (Flink), Pub/Sub, Firestore
+# This is Provider B - handles analytics pipeline (requirement: multi-cloud)
+
 terraform {
   required_version = ">= 1.0"
   required_providers {
@@ -18,7 +22,7 @@ provider "google" {
   zone    = var.gcp_zone
 }
 
-# Enable required APIs
+# Enable required GCP APIs - must be enabled before creating resources
 resource "google_project_service" "required_apis" {
   for_each = toset([
     "dataproc.googleapis.com",
@@ -37,7 +41,8 @@ resource "google_project_service" "required_apis" {
   disable_on_destroy = false
 }
 
-# Networking: Cloud NAT and Firewall Rules for Public Internet Access
+# Networking Module - Cloud NAT and Firewall Rules for internet access
+# Allows Dataproc VMs to download packages and access external services
 module "networking" {
   source = "./modules/networking"
 
@@ -48,7 +53,8 @@ module "networking" {
   depends_on = [google_project_service.required_apis]
 }
 
-# Pub/Sub topics + IAM for ride events
+# Pub/Sub Module - Message queue for event streaming (requirement: stream processing)
+# Receives ride events from AWS Ride Service, consumed by Dataproc Flink
 module "pubsub" {
   source = "./modules/pubsub"
 
@@ -59,7 +65,8 @@ module "pubsub" {
   depends_on = [google_project_service.required_apis]
 }
 
-# Dataproc Cluster for Flink
+# Dataproc Cluster Module - Managed Flink cluster (requirement: stream processing with Flink)
+# Runs real-time analytics on ride events, aggregates by city in 60-second windows
 module "dataproc" {
   source = "./modules/dataproc"
 
@@ -74,7 +81,8 @@ module "dataproc" {
   depends_on = [google_project_service.required_apis]
 }
 
-# Firestore Database for Analytics Results
+# Firestore Module - NoSQL database for analytics results (requirement: cloud storage products - managed NoSQL)
+# Stores aggregated ride counts by city, read by frontend for analytics dashboard
 module "firestore" {
   source = "./modules/firestore"
 

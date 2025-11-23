@@ -1,7 +1,11 @@
+# EKS Module - Managed Kubernetes cluster (requirement: managed K8s with HPA)
+# This cluster hosts all 4 backend microservices as Kubernetes deployments
+
 data "aws_eks_cluster_auth" "cluster" {
   name = aws_eks_cluster.main.id
 }
 
+# EKS Cluster - AWS managed Kubernetes control plane
 resource "aws_eks_cluster" "main" {
   name     = var.cluster_name
   role_arn = aws_iam_role.cluster.arn
@@ -18,6 +22,8 @@ resource "aws_eks_cluster" "main" {
   ]
 }
 
+# EKS Node Group - Worker nodes that run the pods
+# These EC2 instances host the microservice containers
 resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "${var.cluster_name}-nodes"
@@ -25,6 +31,7 @@ resource "aws_eks_node_group" "main" {
   subnet_ids      = var.private_subnets
   instance_types  = ["t3.small"]
 
+  # Node group auto-scaling - scales EC2 instances (different from pod HPA)
   scaling_config {
     desired_size = 4
     max_size     = 10

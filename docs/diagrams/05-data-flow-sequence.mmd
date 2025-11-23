@@ -1,0 +1,27 @@
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant RS as Ride Service
+    participant RDS as RDS PostgreSQL
+    participant PS as Payment Service
+    participant Lambda
+    participant PubSub as Google Pub/Sub
+    participant Flink as Analytics (Flink)
+    participant Firestore
+    
+    User->>Frontend: 1. POST /ride/start
+    Frontend->>RS: POST /ride/start
+    RS->>RDS: 2. INSERT INTO rides
+    RS->>PS: 3. POST /payment/process
+    PS->>RDS: INSERT INTO payments
+    RS->>Lambda: 4. POST /notify (async)
+    RS->>PubSub: 5. Publish ride event
+    PubSub->>Flink: 6. Pull messages
+    Flink->>Flink: 7. Aggregate by city (60s window)
+    Flink->>Firestore: 8. Write aggregated data
+    User->>Frontend: 9. GET /analytics
+    Frontend->>RS: GET /analytics/latest
+    RS->>Firestore: Query analytics
+    Firestore-->>RS: Return data
+    RS-->>Frontend: HTTP Response
+    Frontend-->>User: Display chart

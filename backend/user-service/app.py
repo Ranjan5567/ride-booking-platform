@@ -6,9 +6,11 @@ import os
 from typing import Optional
 import uvicorn
 
+# User Service: Handles user registration, authentication, and profile management
+# This is one of the 4 backend microservices running on AWS EKS
 app = FastAPI(title="User Service", version="1.0.0")
 
-# CORS middleware
+# CORS middleware - allows frontend (localhost:3000) to call this service
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, specify exact origins
@@ -17,7 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database connection
+# Database connection - connects to AWS RDS PostgreSQL
+# Credentials are injected via Kubernetes secrets (db-credentials)
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "ridebooking")
 DB_USER = os.getenv("DB_USER", "admin")
@@ -54,7 +57,9 @@ class UserResponse(BaseModel):
 
 @app.on_event("startup")
 async def startup():
-    # Initialize database tables
+    # Auto-creates database tables on service startup
+    # Users table: stores rider and driver accounts
+    # Cities table: manages available cities for rides
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -81,7 +86,7 @@ async def startup():
 
 @app.post("/user/register", response_model=UserResponse)
 async def register_user(user: UserRegister):
-    """Register a new user (rider or driver)"""
+    """Register a new user (rider or driver) - stores in RDS PostgreSQL"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -121,7 +126,7 @@ async def register_user(user: UserRegister):
 
 @app.post("/user/login", response_model=UserResponse)
 async def login_user(credentials: UserLogin):
-    """Login user (mock authentication)"""
+    """Login user - validates credentials against RDS database"""
     conn = get_db_connection()
     cursor = conn.cursor()
     

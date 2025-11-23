@@ -1,9 +1,12 @@
+// Home Page - Simple redirect based on authentication status
+// Routes to booking page if logged in, otherwise to auth page
 import { useRouter } from 'next/router'
 import { useEffect } from 'react'
 
 export default function Home() {
   const router = useRouter()
 
+  // Checks if user is logged in and redirects accordingly
   useEffect(() => {
     const user = localStorage.getItem('user')
     if (user) {

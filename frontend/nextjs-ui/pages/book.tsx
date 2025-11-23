@@ -1,3 +1,5 @@
+// Book Ride Page - Main booking interface (6th microservice: Frontend)
+// This page triggers the complete ride booking flow: Ride Service → Payment → Lambda → Pub/Sub
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import axios from 'axios'
@@ -14,6 +16,7 @@ export default function BookRide() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
+  // API endpoint - connects to Ride Service (port-forwarded from EKS)
   const RIDE_API = process.env.NEXT_PUBLIC_RIDE_API_URL || 'http://localhost:8003'
 
   useEffect(() => {
@@ -25,18 +28,21 @@ export default function BookRide() {
     setUser(JSON.parse(userData))
   }, [router])
 
+  // Handles ride booking - calls Ride Service which orchestrates:
+  // 1. Stores ride in RDS, 2. Processes payment, 3. Triggers Lambda, 4. Publishes to Pub/Sub
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setMessage('')
 
     try {
+      // API call to Ride Service - triggers the entire microservices orchestration
       const response = await axios.post(`${RIDE_API}/ride/start`, {
         rider_id: user.id,
         driver_id: formData.driver_id,
         pickup: formData.pickup,
         drop: formData.drop,
-        city: formData.city
+        city: formData.city  // City is used for analytics aggregation in Flink
       })
       setMessage(`Ride started successfully! Ride ID: ${response.data.ride_id}`)
       setFormData({ pickup: '', drop: '', city: '', driver_id: 1 })

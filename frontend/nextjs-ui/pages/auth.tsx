@@ -1,3 +1,5 @@
+// Authentication Page - Login/Register using User Service
+// Connects to User Service which stores data in RDS PostgreSQL
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 import axios from 'axios'
@@ -14,14 +16,17 @@ export default function Auth() {
   })
   const [error, setError] = useState('')
 
+  // User Service API endpoint (port-forwarded from EKS)
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'
 
+  // Handles login/registration - calls User Service which validates against RDS database
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
     try {
       if (isLogin) {
+        // Login - validates credentials against RDS PostgreSQL
         const response = await axios.post(`${API_BASE}/user/login`, {
           email: formData.email,
           password: formData.password
@@ -29,6 +34,7 @@ export default function Auth() {
         localStorage.setItem('user', JSON.stringify(response.data))
         router.push('/book')
       } else {
+        // Registration - creates new user in RDS database
         const response = await axios.post(`${API_BASE}/user/register`, formData)
         localStorage.setItem('user', JSON.stringify(response.data))
         router.push('/book')

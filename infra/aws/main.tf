@@ -1,3 +1,5 @@
+# AWS Infrastructure as Code (IaC) - Terraform configuration
+# This file provisions all AWS resources: VPC, EKS, RDS, Lambda, API Gateway, S3
 terraform {
   required_version = ">= 1.0"
   required_providers {
@@ -12,7 +14,8 @@ provider "aws" {
   region = var.aws_region
 }
 
-# VPC
+# VPC Module - Creates network infrastructure (VPC, subnets, NAT gateways, route tables)
+# This provides network isolation and connectivity for all AWS resources
 module "vpc" {
   source = "./modules/vpc"
   
@@ -21,7 +24,9 @@ module "vpc" {
   project_name         = var.project_name
 }
 
-# EKS Cluster
+# EKS Cluster Module - Managed Kubernetes cluster for microservices
+# This is the core infrastructure requirement: managed K8s with HPA support
+# All 4 backend microservices run as pods in this cluster
 module "eks" {
   source = "./modules/eks"
   
@@ -33,7 +38,9 @@ module "eks" {
   depends_on = [module.vpc]
 }
 
-# RDS PostgreSQL
+# RDS PostgreSQL Module - Managed SQL database (requirement: cloud storage products)
+# Stores: users, drivers, rides, payments tables
+# All microservices connect to this shared database
 module "rds" {
   source = "./modules/rds"
   
@@ -46,7 +53,9 @@ module "rds" {
   depends_on = [module.vpc]
 }
 
-# Lambda Function
+# Lambda Function Module - Serverless notification service (requirement: 6 microservices + serverless)
+# This is one of the 6 services: Notification Service (Lambda)
+# Event-driven, asynchronous notifications when rides are created
 module "lambda" {
   source = "./modules/lambda"
   
@@ -55,7 +64,8 @@ module "lambda" {
   runtime       = "python3.11"
 }
 
-# API Gateway
+# API Gateway Module - HTTP endpoint for Lambda function
+# Provides public URL that Ride Service calls to trigger notifications
 module "api_gateway" {
   source = "./modules/api_gateway"
   
@@ -63,7 +73,8 @@ module "api_gateway" {
   lambda_function_name = module.lambda.function_name
 }
 
-# S3 Bucket
+# S3 Bucket Module - Object storage (requirement: cloud storage products)
+# Used for asset storage, Dataproc staging, etc.
 module "s3" {
   source = "./modules/s3"
   

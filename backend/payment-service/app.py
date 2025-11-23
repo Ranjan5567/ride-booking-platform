@@ -3,9 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
+# Payment Service: Processes ride payments (simplified - always succeeds for demo)
+# Called by Ride Service during ride creation
 app = FastAPI(title="Payment Service", version="1.0.0")
 
-# CORS middleware
+# CORS middleware - allows frontend and other services to call this
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, specify exact origins
@@ -27,7 +29,9 @@ class PaymentResponse(BaseModel):
 
 @app.post("/payment/process", response_model=PaymentResponse)
 async def process_payment(payment: PaymentRequest):
-    """Dummy payment service - always returns SUCCESS"""
+    """Payment processing endpoint - called by Ride Service via HTTP
+    In production, this would integrate with payment gateways (Stripe, PayPal, etc.)
+    For demo: always returns SUCCESS"""
     # Simulate instant payment success
     transaction_id = f"TXN{payment.ride_id}{payment.amount}"
     

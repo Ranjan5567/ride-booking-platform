@@ -1,4 +1,7 @@
-# Dataproc Cluster for Flink
+# Dataproc Module - Managed Flink cluster for stream processing (requirement: stream processing)
+# Consumes ride events from Pub/Sub, aggregates by city in 60-second windows, writes to Firestore
+
+# Dataproc Cluster with Flink - runs real-time analytics on ride events
 resource "google_dataproc_cluster" "flink_cluster" {
   name     = var.cluster_name
   project  = var.project_id
@@ -28,10 +31,11 @@ resource "google_dataproc_cluster" "flink_cluster" {
       }
     }
 
-    # Software configuration with built-in Flink component
+    # Software configuration - enables Flink for stream processing
+    # Flink is the stream processing engine that aggregates ride events
     software_config {
       image_version       = "2.2-debian12"
-      optional_components = ["FLINK"]
+      optional_components = ["FLINK"]  # Built-in Flink component
       override_properties = {
         "dataproc:dataproc.allow.zero.workers" = "false"
       }
@@ -72,7 +76,8 @@ resource "random_id" "bucket_suffix" {
   byte_length = 8
 }
 
-# Storage bucket for Dataproc staging
+# Storage bucket for Dataproc - stores Flink job artifacts and staging files
+# Dataproc uses this for job submission and temporary data
 resource "google_storage_bucket" "dataproc_staging" {
   name          = "${var.project_id}-dataproc-staging-${random_id.bucket_suffix.hex}"
   location      = var.region

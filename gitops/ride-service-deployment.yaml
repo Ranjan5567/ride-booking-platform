@@ -1,3 +1,5 @@
+# Ride Service Deployment - Main orchestration service with HPA auto-scaling
+# This deployment is managed by ArgoCD (GitOps) - changes here are automatically synced
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,7 +8,7 @@ metadata:
   labels:
     app: ride-service
 spec:
-  replicas: 2
+  replicas: 2  # Initial replica count - HPA will scale between 2-10 based on CPU
   selector:
     matchLabels:
       app: ride-service
@@ -15,16 +17,19 @@ spec:
       labels:
         app: ride-service
       annotations:
+        # Prometheus annotations - enables metrics scraping for observability
         prometheus.io/scrape: "true"
         prometheus.io/port: "8001"
         prometheus.io/path: "/metrics"
     spec:
       containers:
       - name: ride-service
+        # Container image from AWS ECR (Elastic Container Registry)
         image: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/ride-service:latest
         ports:
         - containerPort: 8003
         env:
+        # Environment variables from Kubernetes Secrets - RDS database credentials
         - name: DB_HOST
           valueFrom:
             secretKeyRef:
@@ -47,13 +52,16 @@ spec:
               key: password
         - name: DB_PORT
           value: "5432"
+        # Service URLs - Payment Service uses Kubernetes internal DNS (ClusterIP)
         - name: PAYMENT_SERVICE_URL
           value: "http://payment-service:80"
+        # Lambda API Gateway URL from ConfigMap - serverless notification endpoint
         - name: LAMBDA_API_URL
           valueFrom:
             configMapKeyRef:
               name: app-config
               key: lambda_api_url
+        # GCP Pub/Sub configuration - cross-cloud event streaming
         - name: PUBSUB_PROJECT_ID
           valueFrom:
             configMapKeyRef:
@@ -64,6 +72,7 @@ spec:
             configMapKeyRef:
               name: app-config
               key: pubsub_rides_topic
+        # GCP Service Account credentials (base64-encoded) - allows AWS service to publish to GCP Pub/Sub
         - name: PUBSUB_PUBLISHER_CREDENTIALS
           valueFrom:
             secretKeyRef:
@@ -75,6 +84,7 @@ spec:
           value: "ride_analytics"
         - name: DISABLE_NOTIFICATIONS
           value: "false"
+        # Resource limits - HPA uses CPU utilization (target: 10%) to scale pods
         resources:
           requests:
             cpu: 200m
@@ -83,6 +93,8 @@ spec:
             cpu: 1000m
             memory: 1Gi
 ---
+# Kubernetes Service - exposes Ride Service internally within the cluster
+# Type: ClusterIP (not accessible from outside, only via port-forward or Ingress)
 apiVersion: v1
 kind: Service
 metadata:
@@ -93,9 +105,12 @@ spec:
     app: ride-service
   ports:
   - port: 80
-    targetPort: 8003
+    targetPort: 8003  # Maps to container port
   type: ClusterIP
 ---
+# Horizontal Pod Autoscaler (HPA) - automatically scales Ride Service based on CPU usage
+# This is a key requirement: managed K8s with auto-scaling
+# When CPU > 10%, scales up to max 10 pods. When CPU < 10%, scales down to min 2 pods
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -106,13 +121,13 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: ride-service
-  minReplicas: 2
-  maxReplicas: 10
+  minReplicas: 2  # Minimum pods (always running)
+  maxReplicas: 10  # Maximum pods (during high load)
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 10
+        averageUtilization: 10  # Target CPU utilization - triggers scaling when exceeded
 

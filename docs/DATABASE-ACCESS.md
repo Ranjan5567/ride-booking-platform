@@ -16,11 +16,6 @@ Password: RideDB_2025!
 
 ## 🔍 Option 1: AWS Query Editor (Easiest)
 
-**Direct Link:**
-```
-https://ap-south-1.console.aws.amazon.com/rds/home?region=ap-south-1#query-editor:
-```
-
 **Steps:**
 1. Click the link above
 2. Click "Connect to database"

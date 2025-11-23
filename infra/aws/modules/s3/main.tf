@@ -1,3 +1,6 @@
+# S3 Module - Object storage (requirement: cloud storage products - object store)
+# Used for asset storage, Dataproc staging, backups, etc.
+
 resource "aws_s3_bucket" "main" {
   bucket = var.bucket_name
 

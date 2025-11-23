@@ -1,4 +1,7 @@
-# Cloud Router for NAT
+# Networking Module - provides internet access for Dataproc VMs
+# Cloud NAT allows Dataproc to download packages, access Pub/Sub, etc.
+
+# Cloud Router - required for Cloud NAT
 resource "google_compute_router" "nat_router" {
   name    = "${var.project_name}-nat-router"
   region  = var.region
@@ -9,7 +12,8 @@ resource "google_compute_router" "nat_router" {
   }
 }
 
-# Cloud NAT for internet access
+# Cloud NAT - provides outbound internet access for Dataproc VMs
+# Allows Flink jobs to download Python packages, access external APIs, etc.
 resource "google_compute_router_nat" "nat" {
   name                               = "${var.project_name}-nat"
   router                             = google_compute_router.nat_router.name

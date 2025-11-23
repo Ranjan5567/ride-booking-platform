@@ -1,9 +1,15 @@
+# Lambda Module - Serverless notification service
+# This is the 5th microservice (serverless): Notification Service
+
+# Package Lambda function code into ZIP
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_file = "${path.module}/function.py"
   output_path = "${path.module}/lambda_function.zip"
 }
 
+# Lambda Function - Serverless compute for notifications
+# Triggered by API Gateway when Ride Service calls the notification endpoint
 resource "aws_lambda_function" "main" {
   filename         = data.archive_file.lambda_zip.output_path
   function_name    = var.function_name

@@ -13,9 +13,12 @@ from google.cloud import firestore
 from google.oauth2 import service_account
 from collections import defaultdict
 
+# Ride Service: Main orchestration service - coordinates ride creation across multiple services
+# Integrates with: Payment Service (REST), Lambda (API Gateway), Pub/Sub (GCP), Firestore (GCP)
+# This service has HPA configured for auto-scaling (2-10 pods based on CPU)
 app = FastAPI(title="Ride Service", version="1.0.0")
 
-# CORS middleware
+# CORS middleware - allows frontend to call this service
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, specify exact origins
@@ -24,14 +27,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database connection
+# Database connection - AWS RDS PostgreSQL for storing ride records
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "ridebooking")
 DB_USER = os.getenv("DB_USER", "admin")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
 DB_PORT = os.getenv("DB_PORT", "5432")
 
-# Service URLs
+# Service URLs - configured via Kubernetes ConfigMaps and Secrets
+# Payment Service: Internal Kubernetes service (ClusterIP)
+# Lambda: AWS API Gateway URL (public endpoint)
+# Pub/Sub: GCP project and topic for event streaming
 PAYMENT_SERVICE_URL = os.getenv("PAYMENT_SERVICE_URL", "http://payment-service:8004")
 LAMBDA_API_URL = os.getenv("LAMBDA_API_URL", "")
 PUBSUB_PROJECT_ID = os.getenv("PUBSUB_PROJECT_ID", "")
@@ -93,7 +99,8 @@ async def startup():
     init_pubsub()
 
 def init_pubsub():
-    """Initialize Pub/Sub publisher client"""
+    """Initialize GCP Pub/Sub publisher client - used to publish ride events for analytics
+    Credentials are base64-encoded service account JSON from Kubernetes secrets"""
     global pubsub_publisher, PUBSUB_TOPIC_PATH
 
     if not PUBSUB_PROJECT_ID or not PUBSUB_RIDES_TOPIC:
@@ -119,7 +126,8 @@ def init_pubsub():
         PUBSUB_TOPIC_PATH = None
 
 async def publish_to_pubsub(ride_data: dict):
-    """Publish ride event to Google Pub/Sub"""
+    """Publishes ride event to GCP Pub/Sub topic - consumed by Dataproc Flink for real-time analytics
+    This enables cross-cloud communication: AWS (Ride Service) → GCP (Analytics Pipeline)"""
     global pubsub_publisher, PUBSUB_TOPIC_PATH
 
     if not pubsub_publisher or not PUBSUB_TOPIC_PATH:
@@ -139,7 +147,8 @@ async def publish_to_pubsub(ride_data: dict):
         # Don't fail the request if Pub/Sub is unavailable
 
 async def call_notification_lambda(ride_id: int, city: str):
-    """Call notification Lambda via API Gateway"""
+    """Calls AWS Lambda function via API Gateway - serverless notification service
+    This demonstrates serverless integration with microservices"""
     if DISABLE_NOTIFICATIONS or not LAMBDA_API_URL:
         print("Notifications disabled or API URL not configured")
         return
@@ -158,12 +167,17 @@ async def call_notification_lambda(ride_id: int, city: str):
 
 @app.post("/ride/start", response_model=dict)
 async def start_ride(ride: RideStart):
-    """Start a new ride - main service that orchestrates payment, notification, and event publishing"""
+    """Main orchestration endpoint - coordinates the entire ride booking flow:
+    1. Store ride in RDS PostgreSQL
+    2. Process payment via Payment Service (REST call)
+    3. Send notification via Lambda (API Gateway)
+    4. Publish event to GCP Pub/Sub for analytics
+    This demonstrates microservices communication patterns"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        # 1. Store ride in RDS
+        # 1. Store ride in RDS PostgreSQL (AWS)
         cursor.execute("""
             INSERT INTO rides (rider_id, driver_id, pickup, drop_location, city, status)
             VALUES (%s, %s, %s, %s, %s, 'started')
@@ -175,7 +189,7 @@ async def start_ride(ride: RideStart):
         created_at = result[1]
         conn.commit()
         
-        # 2. Call Payment Service
+        # 2. Call Payment Service - synchronous REST call to another microservice
         try:
             async with httpx.AsyncClient() as client:
                 payment_response = await client.post(
@@ -190,10 +204,10 @@ async def start_ride(ride: RideStart):
             print(f"Payment service error: {str(e)}")
             # In demo mode, continue even if payment service is down
         
-        # 3. Call Notification Lambda (if enabled)
+        # 3. Call Notification Lambda - asynchronous serverless notification (AWS)
         await call_notification_lambda(ride_id, ride.city)
         
-        # 4. Publish to Azure Event Hub
+        # 4. Publish to GCP Pub/Sub - event streaming for real-time analytics (cross-cloud)
         ride_event = {
             "ride_id": ride_id,
             "rider_id": ride.rider_id,
@@ -288,7 +302,8 @@ async def get_ride(ride_id: int):
 
 @app.get("/analytics/latest")
 async def get_analytics():
-    """Get latest analytics data from Firestore"""
+    """Retrieves aggregated analytics from GCP Firestore - results from Flink stream processing
+    This endpoint demonstrates cross-cloud data access: AWS service reading from GCP database"""
     try:
         # Get Firestore configuration from environment
         firestore_project_id = os.getenv("PUBSUB_PROJECT_ID", "careful-cosine-478715-a0")

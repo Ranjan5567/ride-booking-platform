@@ -6,9 +6,11 @@ import os
 from typing import Optional
 import uvicorn
 
+# Driver Service: Manages driver profiles, vehicle info, and online/offline status
+# Runs on AWS EKS alongside other microservices
 app = FastAPI(title="Driver Service", version="1.0.0")
 
-# CORS middleware
+# CORS middleware - allows frontend to call this service
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, specify exact origins
@@ -17,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database connection
+# Database connection - AWS RDS PostgreSQL (shared database with other services)
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "ridebooking")
 DB_USER = os.getenv("DB_USER", "admin")
@@ -54,7 +56,7 @@ class DriverResponse(BaseModel):
 
 @app.on_event("startup")
 async def startup():
-    # Initialize database table
+    # Creates drivers table in RDS - stores driver profiles and vehicle information
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -104,7 +106,7 @@ async def create_driver(driver: DriverCreate):
 
 @app.put("/driver/status", response_model=DriverResponse)
 async def update_driver_status(status: DriverStatus):
-    """Update driver status (online/offline)"""
+    """Update driver status (online/offline) - used to track driver availability"""
     conn = get_db_connection()
     cursor = conn.cursor()
     

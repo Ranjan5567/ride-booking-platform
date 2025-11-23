@@ -1,3 +1,6 @@
+// Analytics Dashboard - Displays real-time analytics from GCP Firestore
+// Data flow: Ride Service → Pub/Sub → Flink (Dataproc) → Firestore → Frontend
+// This demonstrates the complete analytics pipeline: stream processing with time-windowed aggregation
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import axios from 'axios'
@@ -14,6 +17,7 @@ export default function Analytics() {
   const [data, setData] = useState<AnalyticsData[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Ride Service endpoint - it reads from Firestore and aggregates results
   const RIDE_API = process.env.NEXT_PUBLIC_RIDE_API_URL || 'http://localhost:8003'
 
   useEffect(() => {
@@ -23,13 +27,16 @@ export default function Analytics() {
       return
     }
     fetchAnalytics()
-    const interval = setInterval(fetchAnalytics, 30000) // Refresh every 30s
+    // Auto-refresh every 30 seconds to show real-time updates from Flink stream processing
+    const interval = setInterval(fetchAnalytics, 30000)
     return () => clearInterval(interval)
   }, [router])
 
+  // Fetches aggregated analytics - Ride Service reads from GCP Firestore
+  // Firestore contains results from Flink stream processing (60-second windows)
   const fetchAnalytics = async () => {
     try {
-      // Fetching real-time analytics from ride service (aggregated from Firestore)
+      // This endpoint reads from Firestore - data aggregated by Flink from Pub/Sub events
       const response = await axios.get(`${RIDE_API}/analytics/latest`)
       setData(response.data)
     } catch (err) {
@@ -59,7 +66,10 @@ export default function Analytics() {
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h1 className="text-3xl font-bold mb-6 text-gray-800">Ride Analytics Dashboard</h1>
-          <p className="text-gray-600 mb-6">Rides per city per minute (processed by Flink → Google Firestore)</p>
+          <p className="text-gray-600 mb-6">
+            Real-time analytics: Rides aggregated by city in 60-second windows
+            (AWS Ride Service → GCP Pub/Sub → Flink → Firestore → Frontend)
+          </p>
           
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
