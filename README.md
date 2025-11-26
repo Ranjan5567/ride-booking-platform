@@ -11,7 +11,9 @@
 
 ## 🎯 **Project Overview**
 
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 A fully functional ride booking platform demonstrating:
+
 - ✅ **Multi-cloud architecture** (AWS + GCP)
 - ✅ **Microservices** (6 services across 2 clouds)
 - ✅ **Real-time streaming** (Apache Flink on Google Dataproc)
@@ -115,6 +117,7 @@ A fully functional ride booking platform demonstrating:
 ## 🚀 **Quick Start (30 Minutes)**
 
 ### **Prerequisites**
+
 - AWS Account + CLI configured
 - GCP Account + CLI configured
 - Docker, Terraform, kubectl, Helm installed
@@ -122,13 +125,14 @@ A fully functional ride booking platform demonstrating:
 ### **Deploy**
 
 1. **Deploy Infrastructure** (10 min)
+
    ```bash
    # AWS
    cd infra/aws
    cp terraform.tfvars.example terraform.tfvars
    # Edit terraform.tfvars
    terraform init && terraform apply
-   
+
    # GCP
    cd ../gcp
    cp terraform.tfvars.example terraform.tfvars
@@ -136,14 +140,15 @@ A fully functional ride booking platform demonstrating:
    terraform init && terraform apply
    ```
 
-3. **Deploy Microservices** (10 min)
+2. **Deploy Microservices** (10 min)
+
    ```bash
    # Build & push Docker images
    # Configure kubectl
    # Deploy via ArgoCD
    ```
 
-4. **Deploy Flink Job** (5 min)
+3. **Deploy Flink Job** (5 min)
    ```bash
    cd analytics/flink-job
    mvn clean package
@@ -170,51 +175,56 @@ A fully functional ride booking platform demonstrating:
 
 ## ✅ **Project Requirements Met**
 
-| Requirement | Implementation | Status |
-|-------------|----------------|--------|
-| **6 Microservices** | user, driver, ride, payment, notification (Lambda), analytics (Flink) | ✅ |
-| **Multiple Clouds** | AWS (Provider A) + GCP (Provider B) | ✅ |
-| **IaC** | Terraform for all infrastructure | ✅ |
-| **Managed K8s** | AWS EKS | ✅ |
-| **HPA** | ride-service & user-service | ✅ |
-| **GitOps** | ArgoCD | ✅ |
-| **Flink on Managed Cluster** | Google Dataproc | ✅ |
-| **Managed Pub/Sub** | Google Cloud Pub/Sub | ✅ |
-| **SQL Database** | RDS PostgreSQL | ✅ |
-| **NoSQL Database** | Firestore | ✅ |
-| **Object Storage** | S3 | ✅ |
-| **Serverless** | AWS Lambda | ✅ |
-| **Observability** | Prometheus + Grafana + Loki | ✅ |
-| **Load Testing** | k6 | ✅ |
+| Requirement                  | Implementation                                                        | Status |
+| ---------------------------- | --------------------------------------------------------------------- | ------ |
+| **6 Microservices**          | user, driver, ride, payment, notification (Lambda), analytics (Flink) | ✅     |
+| **Multiple Clouds**          | AWS (Provider A) + GCP (Provider B)                                   | ✅     |
+| **IaC**                      | Terraform for all infrastructure                                      | ✅     |
+| **Managed K8s**              | AWS EKS                                                               | ✅     |
+| **HPA**                      | ride-service & user-service                                           | ✅     |
+| **GitOps**                   | ArgoCD                                                                | ✅     |
+| **Flink on Managed Cluster** | Google Dataproc                                                       | ✅     |
+| **Managed Pub/Sub**          | Google Cloud Pub/Sub                                                  | ✅     |
+| **SQL Database**             | RDS PostgreSQL                                                        | ✅     |
+| **NoSQL Database**           | Firestore                                                             | ✅     |
+| **Object Storage**           | S3                                                                    | ✅     |
+| **Serverless**               | AWS Lambda                                                            | ✅     |
+| **Observability**            | Prometheus + Grafana + Loki                                           | ✅     |
+| **Load Testing**             | k6                                                                    | ✅     |
 
 ---
 
 ## 🛠️ **Technology Stack**
 
 ### **Backend**
+
 - **Language:** Python 3.10+
 - **Framework:** FastAPI
 - **Database:** PostgreSQL (RDS)
 - **API:** REST
 
 ### **Frontend**
+
 - **Framework:** Next.js 14
 - **Language:** TypeScript
 - **Styling:** Tailwind CSS
 
 ### **Infrastructure**
+
 - **IaC:** Terraform
 - **Container Orchestration:** Kubernetes (EKS)
 - **CI/CD:** GitOps with ArgoCD
 - **Container Registry:** AWS ECR / Docker Hub
 
 ### **Streaming**
+
 - **Platform:** Apache Flink 1.18
 - **Cluster:** Google Dataproc
 - **Message Broker:** Google Cloud Pub/Sub (rides + ride-results topics)
 - **Processing:** Time-windowed aggregation
 
 ### **Monitoring**
+
 - **Metrics:** Prometheus + Grafana
 - **Logging:** Loki + Promtail
 - **Alerting:** Grafana Alertmanager
@@ -224,6 +234,7 @@ A fully functional ride booking platform demonstrating:
 ## 📊 **Key Features**
 
 ### **1. Real-Time Stream Processing**
+
 - Flink consumes ride events from Kafka
 - Performs time-windowed aggregation (1-minute windows)
 - Calculates rides per city in real-time
@@ -231,21 +242,25 @@ A fully functional ride booking platform demonstrating:
 - Stores aggregated data in Firestore
 
 ### **2. Auto-Scaling**
+
 - HPA scales ride-service from 2→8 pods
 - Based on CPU utilization (target: 70%)
 - Tested with k6 load testing tool
 
 ### **3. Multi-Cloud Architecture**
+
 - AWS for core application services
 - GCP for analytics workload (Dataproc + Firestore)
 - Confluent Cloud for managed Kafka messaging
 
 ### **4. GitOps Deployment**
+
 - All deployments via ArgoCD
 - Git as single source of truth
 - Automatic sync from repository
 
 ### **5. Comprehensive Monitoring**
+
 - Prometheus scrapes metrics from all services
 - Grafana dashboards for visualization
 - Loki for centralized logging
@@ -262,6 +277,7 @@ A fully functional ride booking platform demonstrating:
 ## 🧪 **Testing**
 
 ### **Manual Testing**
+
 ```bash
 # Health check
 curl http://localhost:8003/health
@@ -271,12 +287,14 @@ curl -X POST http://localhost:8003/ride/start -H "Content-Type: application/json
 ```
 
 ### **Load Testing**
+
 ```bash
 cd loadtest
 k6 run ride_service_test.js
 ```
 
 ### **Verify HPA Scaling**
+
 ```bash
 kubectl get hpa --watch
 kubectl get pods -l app=ride-service --watch
