@@ -1,0 +1,296 @@
+{
+    "uid": "ride-booking-complete",
+    "title": "Ride Booking Platform - Complete Dashboard",
+    "tags": ["ride-booking", "microservices"],
+    "timezone": "browser",
+    "schemaVersion": 27,
+    "version": 3,
+    "refresh": "30s",
+  
+    "panels": [
+  
+      {
+        "id": 1,
+        "title": "Ride Service - Pod Count (HPA)",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+  
+        "lines": true,
+        "points": false,
+        "linewidth": 2,
+        "interval": "10s",
+  
+        "targets": [
+          {
+            "expr": "kube_deployment_status_replicas{deployment=\"ride-service\"}",
+            "legendFormat": "Current Replicas",
+            "refId": "A"
+          },
+          {
+            "expr": "kube_deployment_spec_replicas{deployment=\"ride-service\"}",
+            "legendFormat": "Desired Replicas",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          { "format": "short", "label": "Pods" },
+          { "format": "short" }
+        ],
+        "xaxis": { "mode": "time" }
+      },
+  
+      {
+        "id": 2,
+        "title": "All Services - Pod Count",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+  
+        "lines": true,
+        "points": false,
+        "linewidth": 2,
+        "interval": "10s",
+  
+        "targets": [
+          {
+            "expr": "kube_deployment_status_replicas{deployment=~\"ride-service|user-service|driver-service|payment-service\"}",
+            "legendFormat": "{{deployment}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          { "format": "short", "label": "Pods" },
+          { "format": "short" }
+        ],
+        "xaxis": { "mode": "time" }
+      },
+  
+      {
+        "id": 3,
+        "title": "Ride Service - CPU Usage",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+  
+        "lines": true,
+        "points": false,
+        "linewidth": 2,
+        "interval": "10s",
+  
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{pod=~\"ride-service.*\", container!=\"POD\"}[2m]) * 100",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          { "format": "percent", "label": "CPU %" },
+          { "format": "short" }
+        ],
+        "xaxis": { "mode": "time" }
+      },
+  
+      {
+        "id": 4,
+        "title": "Ride Service - Memory Usage",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+  
+        "lines": true,
+        "points": false,
+        "linewidth": 2,
+        "interval": "10s",
+  
+        "targets": [
+          {
+            "expr": "container_memory_working_set_bytes{pod=~\"ride-service.*\", container!=\"POD\"} / 1024 / 1024",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          { "format": "mbytes", "label": "Memory (MB)" },
+          { "format": "short" }
+        ],
+        "xaxis": { "mode": "time" }
+      },
+  
+      {
+        "id": 5,
+        "title": "All Services - Network Traffic (Request Proxy)",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+  
+        "lines": true,
+        "points": false,
+        "linewidth": 2,
+        "interval": "10s",
+  
+        "targets": [
+          {
+            "expr": "sum(rate(container_network_receive_bytes_total{pod=~\"ride-service.*|user-service.*|driver-service.*|payment-service.*\"}[2m])) by (pod) / 1024",
+            "legendFormat": "{{pod}} - Incoming (KB/s)",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(container_network_transmit_bytes_total{pod=~\"ride-service.*|user-service.*|driver-service.*|payment-service.*\"}[2m])) by (pod) / 1024",
+            "legendFormat": "{{pod}} - Outgoing (KB/s)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          { "format": "KBs", "label": "Network Traffic (KB/s)" },
+          { "format": "short" }
+        ],
+        "xaxis": { "mode": "time" }
+      },
+  
+      {
+        "id": 6,
+        "title": "All Services - Pod Restarts (Error Indicator)",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+  
+        "lines": true,
+        "points": false,
+        "linewidth": 2,
+        "interval": "10s",
+  
+        "targets": [
+          {
+            "expr": "increase(kube_pod_container_status_restarts_total{pod=~\"ride-service.*|user-service.*|driver-service.*|payment-service.*\"}[2m])",
+            "legendFormat": "{{pod}} - Restarts",
+            "refId": "A"
+          },
+          {
+            "expr": "kube_pod_container_status_waiting_reason{pod=~\"ride-service.*|user-service.*|driver-service.*|payment-service.*\"}",
+            "legendFormat": "{{pod}} - Waiting",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          { "format": "short", "label": "Count" },
+          { "format": "short" }
+        ],
+        "xaxis": { "mode": "time" }
+      },
+  
+      {
+        "id": 7,
+        "title": "Ride Service - Activity (Network Traffic)",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+  
+        "lines": true,
+        "points": false,
+        "linewidth": 2,
+        "interval": "10s",
+  
+        "targets": [
+          {
+            "expr": "sum(rate(container_network_receive_bytes_total{pod=~\"ride-service.*\"}[5m])) / 1024",
+            "legendFormat": "Ride Service - Incoming Traffic (KB/s)",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(container_network_transmit_bytes_total{pod=~\"ride-service.*\"}[5m])) / 1024",
+            "legendFormat": "Ride Service - Outgoing Traffic (KB/s)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          { "format": "KBs", "label": "Network Traffic (KB/s)" },
+          { "format": "short" }
+        ],
+        "xaxis": { "mode": "time" },
+        "description": "Network traffic as proxy for ride activity. Higher traffic = more requests."
+      },
+  
+      {
+        "id": 8,
+        "title": "Ride Service - Request Processing Rate",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+  
+        "lines": true,
+        "points": false,
+        "linewidth": 2,
+        "interval": "10s",
+  
+        "targets": [
+          {
+            "expr": "sum(rate(container_network_receive_packets_total{pod=~\"ride-service.*\"}[2m]))",
+            "legendFormat": "Ride Service - Packets/sec (Incoming)",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(container_network_transmit_packets_total{pod=~\"ride-service.*\"}[2m]))",
+            "legendFormat": "Ride Service - Packets/sec (Outgoing)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          { "format": "pps", "label": "Packets/sec" },
+          { "format": "short" }
+        ],
+        "xaxis": { "mode": "time" },
+        "description": "Network packets as proxy for request rate. More packets = more activity."
+      },
+  
+      {
+        "id": 9,
+        "title": "All Services - CPU Usage",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+  
+        "lines": true,
+        "points": false,
+        "linewidth": 2,
+        "interval": "10s",
+  
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{pod=~\"ride-service.*|user-service.*|driver-service.*|payment-service.*\", container!=\"POD\"}[2m]) * 100",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          { "format": "percent", "label": "CPU %" },
+          { "format": "short" }
+        ],
+        "xaxis": { "mode": "time" }
+      },
+  
+      {
+        "id": 10,
+        "title": "All Services - Memory Usage",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+  
+        "lines": true,
+        "points": false,
+        "linewidth": 2,
+        "interval": "10s",
+  
+        "targets": [
+          {
+            "expr": "container_memory_working_set_bytes{pod=~\"ride-service.*|user-service.*|driver-service.*|payment-service.*\", container!=\"POD\"} / 1024 / 1024",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          { "format": "mbytes", "label": "Memory (MB)" },
+          { "format": "short" }
+        ],
+        "xaxis": { "mode": "time" }
+      }
+  
+    ],
+  
+    "time": { "from": "now-1h", "to": "now" },
+    "timepicker": {
+      "refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+    }
+  }
+  

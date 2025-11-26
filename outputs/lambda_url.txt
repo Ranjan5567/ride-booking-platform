@@ -1,0 +1,1 @@
+﻿https://hvt2s5t8tj.execute-api.ap-south-1.amazonaws.com/notify

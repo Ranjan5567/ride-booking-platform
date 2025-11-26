@@ -1,0 +1,88 @@
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#FF6B6B','primaryTextColor':'#FFFFFF','primaryBorderColor':'#CC0000','lineColor':'#0066CC','secondaryColor':'#4ECDC4','tertiaryColor':'#FFE66D','noteBkgColor':'#E6F3FF','noteTextColor':'#000000','noteBorderColor':'#0066CC','actorBkgColor':'#E8F4F8','actorBorderColor':'#0066CC','actorTextColor':'#000000','actorLineColor':'#0066CC','signalColor':'#0066CC','signalTextColor':'#000000','labelBoxBkgColor':'#FFE6E6','labelBoxBorderColor':'#FF6B6B','labelTextColor':'#000000','loopTextColor':'#000000','activationBkgColor':'#FFE6E6','activationBorderColor':'#FF6B6B','sequenceNumberColor':'#FFFFFF'}}}%%
+sequenceDiagram
+    participant User as 👤 User<br/>(Browser)
+    participant Frontend as 🌐 Frontend<br/>(Next.js)
+    participant RS as 🚕 Ride Service<br/>(Orchestrator)
+    participant RDS as 💾 RDS PostgreSQL<br/>(AWS)
+    participant PS as 💳 Payment Service
+    participant Lambda as ⚡ Lambda<br/>(Notifications)
+    participant PubSub as 📨 Google Pub/Sub<br/>(GCP)
+    participant Flink as ⚙️ Analytics Flink<br/>(Dataproc)
+    participant Firestore as 🔥 Firestore<br/>(GCP)
+    
+    rect rgb(173, 216, 230)
+        Note over User,Firestore: 🚀 RIDE BOOKING FLOW
+    end
+    
+    User->>+Frontend: 1. POST /ride/start<br/>(pickup, drop, city)
+    activate Frontend
+    Frontend->>+RS: 2. POST /ride/start<br/>(rider_id, driver_id, pickup, drop, city)
+    activate RS
+    
+    RS->>+RDS: 3. INSERT INTO rides<br/>(Store ride record)
+    activate RDS
+    RDS-->>-RS: ✅ Ride ID created
+    deactivate RDS
+    
+    RS->>+PS: 4. POST /payment/process<br/>(ride_id, amount: 100.0)
+    activate PS
+    PS->>+RDS: 5. INSERT INTO payments<br/>(Store payment)
+    activate RDS
+    RDS-->>-PS: ✅ Payment recorded
+    deactivate RDS
+    PS-->>-RS: ✅ Payment SUCCESS
+    deactivate PS
+    
+    rect rgb(255, 250, 200)
+        Note over RS,Firestore: ⚡ ASYNC OPERATIONS (Non-blocking)
+        
+        par Parallel Processing
+            RS->>+Lambda: 6. POST /notify<br/>(ride_id, city) via API Gateway
+            activate Lambda
+            Lambda->>Lambda: 7. Log to CloudWatch<br/>"Ride {id} created in {city}"
+            Lambda-->>-RS: ✅ Notification logged
+            deactivate Lambda
+        and
+            RS->>+PubSub: 8. Publish ride event<br/>(JSON: ride_id, city, timestamp)
+            activate PubSub
+            PubSub->>+Flink: 9. Pull message<br/>(Subscription: ride-booking-rides-flink)
+            activate Flink
+            Flink->>Flink: 10. Extract city<br/>Increment city counter
+            Flink->>Flink: 11. Window aggregation<br/>(60-second tumbling window)
+            Flink->>+Firestore: 12. Write aggregated result<br/>(city, count, timestamp)
+            activate Firestore
+            Firestore-->>-Flink: ✅ Data stored
+            deactivate Firestore
+            Flink-->>-PubSub: ✅ Processing complete
+            deactivate Flink
+            PubSub-->>-RS: ✅ Event published
+            deactivate PubSub
+        end
+    end
+    
+    RS-->>-Frontend: ✅ Ride created successfully
+    deactivate RS
+    Frontend-->>-User: ✅ Ride ID: {ride_id}
+    deactivate Frontend
+    
+    rect rgb(200, 255, 200)
+        Note over User,Firestore: 📊 ANALYTICS QUERY FLOW
+    end
+    
+    User->>+Frontend: 13. GET /analytics<br/>(View dashboard)
+    activate Frontend
+    Frontend->>+RS: 14. GET /analytics/latest
+    activate RS
+    RS->>+Firestore: 15. Query ride_analytics<br/>(Aggregate by city)
+    activate Firestore
+    Firestore-->>-RS: 16. Return aggregated data<br/>[{city: "Mumbai", count: 45}, ...]
+    deactivate Firestore
+    RS-->>-Frontend: 17. HTTP 200 Response<br/>(JSON analytics data)
+    deactivate RS
+    Frontend->>Frontend: 18. Render bar chart<br/>(Recharts visualization)
+    Frontend-->>-User: 19. Display analytics<br/>(Real-time dashboard)
+    deactivate Frontend
+    
+    rect rgb(255, 200, 220)
+        Note over User,Firestore: 🌐 CROSS-CLOUD: AWS → GCP → AWS → Frontend
+    end

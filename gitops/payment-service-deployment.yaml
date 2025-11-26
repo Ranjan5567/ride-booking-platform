@@ -1,0 +1,50 @@
+# Payment Service Deployment - stateless service called by Ride Service
+# No database dependency - simplified payment processing for demo
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: default
+  labels:
+    app: payment-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8004"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: payment-service
+        image: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/payment-service:latest
+        ports:
+        - containerPort: 8004
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+# Kubernetes Service for Payment Service - accessed by Ride Service via internal DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+  namespace: default
+spec:
+  selector:
+    app: payment-service
+  ports:
+  - port: 80
+    targetPort: 8004
+  type: ClusterIP
+

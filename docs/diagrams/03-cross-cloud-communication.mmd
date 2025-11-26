@@ -1,0 +1,13 @@
+graph LR
+    RS[Ride Service<br/>AWS EKS] -->|Publishes events<br/>Pub/Sub SDK| PUBSUB[Google Pub/Sub<br/>GCP]
+    PUBSUB -->|Consumes messages<br/>Pull subscription| FLINK[Analytics Job<br/>GCP Dataproc]
+    FLINK -->|Writes aggregated data<br/>Firestore SDK| FIRESTORE[Firestore<br/>GCP]
+    FIRESTORE -->|Queries analytics<br/>Firestore REST API| RS2[Ride Service<br/>AWS EKS<br/>/analytics/latest]
+    RS2 -->|HTTP Response| FRONTEND[Frontend<br/>Next.js]
+    
+    style RS fill:#FF9900,stroke:#232F3E
+    style RS2 fill:#FF9900,stroke:#232F3E
+    style PUBSUB fill:#4285F4,stroke:#1A73E8
+    style FLINK fill:#4285F4,stroke:#1A73E8
+    style FIRESTORE fill:#4285F4,stroke:#1A73E8
+    style FRONTEND fill:#61DAFB,stroke:#20232A

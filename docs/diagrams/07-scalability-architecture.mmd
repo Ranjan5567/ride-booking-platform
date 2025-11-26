@@ -1,0 +1,18 @@
+graph TB
+    LB[Load Balancer<br/>Kubernetes Service] -->|Distributes load| POD1[Ride Service Pod 1<br/>2 CPU]
+    LB -->|Distributes load| POD2[Ride Service Pod 2<br/>2 CPU]
+    LB -->|Distributes load| PODN[Ride Service Pod N<br/>2 CPU]
+    
+    POD1 --> HPA[HPA Controller<br/>Metrics Server<br/>Monitors CPU<br/>Target: 5%]
+    POD2 --> HPA
+    PODN --> HPA
+    
+    HPA -->|If CPU > 5%| SCALEUP[Scale Up<br/>Add Pods]
+    HPA -->|If CPU < 5%| SCALEDOWN[Scale Down<br/>Remove Pods]
+    
+    SCALEUP --> PODN
+    SCALEDOWN --> POD1
+    
+    style HPA fill:#10B981,stroke:#059669,stroke-width:3px
+    style SCALEUP fill:#3B82F6,stroke:#2563EB
+    style SCALEDOWN fill:#EF4444,stroke:#DC2626

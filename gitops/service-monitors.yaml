@@ -1,0 +1,68 @@
+# ServiceMonitor resources for Prometheus to scrape ride-booking services
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: user-service-monitor
+  namespace: monitoring
+  labels:
+    app: user-service
+spec:
+  selector:
+    matchLabels:
+      app: user-service
+  namespaceSelector:
+    matchNames:
+    - default
+  endpoints:
+  - port: "80"
+    interval: 15s
+    path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: driver-service-monitor
+  namespace: monitoring
+  labels:
+    app: driver-service
+spec:
+  selector:
+    matchLabels:
+      app: driver-service
+  endpoints:
+  - port: http
+    interval: 15s
+    path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ride-service-monitor
+  namespace: monitoring
+  labels:
+    app: ride-service
+spec:
+  selector:
+    matchLabels:
+      app: ride-service
+  endpoints:
+  - port: http
+    interval: 15s
+    path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: payment-service-monitor
+  namespace: monitoring
+  labels:
+    app: payment-service
+spec:
+  selector:
+    matchLabels:
+      app: payment-service
+  endpoints:
+  - port: http
+    interval: 15s
+    path: /metrics
+

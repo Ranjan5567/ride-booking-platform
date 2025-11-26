@@ -1,0 +1,17 @@
+# GCP Configuration
+gcp_project_id = "careful-cosine-478715-a0"
+gcp_region     = "asia-south1"  # Mumbai, India
+gcp_zone       = "asia-south1-a"
+
+# Project Configuration
+project_name = "ride-booking"
+
+# Dataproc Configuration
+dataproc_machine_type = "n1-standard-2"
+dataproc_num_workers  = 2
+
+# Firestore Configuration
+firestore_location = "asia-south1"  # Mumbai, India
+
+# Pub/Sub (managed by Terraform, no manual config required)
+

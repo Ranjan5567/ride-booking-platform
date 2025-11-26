@@ -1,0 +1,73 @@
+# Driver Service Deployment - manages driver profiles and status
+# GitOps-managed deployment via ArgoCD
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: driver-service
+  namespace: default
+  labels:
+    app: driver-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: driver-service
+  template:
+    metadata:
+      labels:
+        app: driver-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8002"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: driver-service
+        image: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/driver-service:latest
+        ports:
+        - containerPort: 8002
+        env:
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: host
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: name
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: user
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
+        - name: DB_PORT
+          value: "5432"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+# Kubernetes Service for Driver Service - ClusterIP for internal access
+apiVersion: v1
+kind: Service
+metadata:
+  name: driver-service
+  namespace: default
+spec:
+  selector:
+    app: driver-service
+  ports:
+  - port: 80
+    targetPort: 8002
+  type: ClusterIP
+

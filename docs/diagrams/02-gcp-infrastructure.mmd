@@ -1,0 +1,20 @@
+graph TB
+    subgraph GCP["GCP Cloud (Analytics)"]
+        subgraph DATAPROC["Google Dataproc Cluster"]
+            MASTER[Master Node<br/>Apache Flink<br/>Analytics Processor]
+            WORKER1[Worker Node 1]
+            WORKER2[Worker Node 2]
+        end
+        
+        PUBSUB[Google Cloud Pub/Sub<br/>ride-booking-rides<br/>ride-booking-ride-results]
+        FIRESTORE[(Firestore NoSQL<br/>ride-booking-analytics<br/>ride_analytics collection)]
+        STORAGE[(Cloud Storage<br/>Dataproc Staging)]
+        
+        DATAPROC --> PUBSUB
+        DATAPROC --> FIRESTORE
+        DATAPROC --> STORAGE
+    end
+    
+    style GCP fill:#4285F4,stroke:#1A73E8,stroke-width:3px
+    style DATAPROC fill:#34A853,stroke:#1A73E8,stroke-width:2px
+    style FIRESTORE fill:#EA4335,stroke:#1A73E8,stroke-width:2px

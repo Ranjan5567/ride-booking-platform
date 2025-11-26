@@ -1,0 +1,24 @@
+graph TB
+    subgraph TERRAFORM["Terraform (IaC)"]
+        AWS_MODULE[AWS Module<br/>VPC, EKS, RDS<br/>Lambda, API Gateway]
+        GCP_MODULE[GCP Module<br/>Dataproc, Pub/Sub<br/>Firestore, Storage]
+    end
+    
+    AWS_MODULE -->|terraform apply| AWS_RESOURCES[AWS Resources<br/>EKS Cluster<br/>RDS Instance<br/>Lambda Function]
+    GCP_MODULE -->|terraform apply| GCP_RESOURCES[GCP Resources<br/>Dataproc<br/>Pub/Sub Topics<br/>Firestore DB]
+    
+    AWS_RESOURCES --> K8S[Kubernetes EKS]
+    GCP_RESOURCES --> K8S
+    
+    subgraph K8S
+        ARGOCD[ArgoCD GitOps<br/>Monitors Git repo<br/>Auto-deploys changes]
+        APPS[Application Services<br/>User Service<br/>Driver Service<br/>Ride Service HPA<br/>Payment Service]
+        MONITORING[Monitoring Stack<br/>Prometheus<br/>Grafana<br/>Loki]
+    end
+    
+    ARGOCD -->|Deploys from Git| APPS
+    
+    style TERRAFORM fill:#7C3AED,stroke:#5B21B6,stroke-width:2px
+    style AWS_MODULE fill:#FF9900,stroke:#232F3E
+    style GCP_MODULE fill:#4285F4,stroke:#1A73E8
+    style ARGOCD fill:#EF4444,stroke:#DC2626,stroke-width:2px
