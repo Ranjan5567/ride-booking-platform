@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/your-org/ride-booking-platform.git
+    repoURL: https://github.com/Ranjan5567/ride-booking-platform
     targetRevision: main
     path: gitops
     directory:
@@ -19,7 +19,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-    - CreateNamespace=true
+      - CreateNamespace=true
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -29,7 +29,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/your-org/ride-booking-platform.git
+    repoURL: https://github.com/Ranjan5567/ride-booking-platform.git
     targetRevision: main
     path: gitops
     directory:
@@ -50,7 +50,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/your-org/ride-booking-platform.git
+    repoURL: https://github.com/Ranjan5567/ride-booking-platform.git
     targetRevision: main
     path: gitops
     directory:
@@ -71,7 +71,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/your-org/ride-booking-platform.git
+    repoURL: https://github.com/Ranjan5567/ride-booking-platform.git
     targetRevision: main
     path: gitops
     directory:
@@ -83,4 +83,3 @@ spec:
     automated:
       prune: true
       selfHeal: true
-
