@@ -191,7 +191,7 @@ async def start_ride(ride: RideStart):
         # 3. Call Notification Lambda (if enabled)
         await call_notification_lambda(ride_id, ride.city)
         
-        # 4. Publish to Azure Event Hub
+        
         ride_event = {
             "ride_id": ride_id,
             "rider_id": ride.rider_id,

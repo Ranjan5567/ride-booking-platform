@@ -16,6 +16,7 @@ provider "google" {
   project = var.gcp_project_id
   region  = var.gcp_region
   zone    = var.gcp_zone
+   credentials = file("sa-key.json")
 }
 
 # Enable required APIs
@@ -73,4 +74,3 @@ module "firestore" {
 
   depends_on = [google_project_service.required_apis]
 }
-

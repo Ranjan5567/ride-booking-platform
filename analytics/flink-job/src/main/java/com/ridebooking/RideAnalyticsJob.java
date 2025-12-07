@@ -11,13 +11,15 @@ import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
-import org.apache.flink.connector.gcp.pubsub.source.PubSubSource;
-import org.apache.flink.connector.gcp.pubsub.sink.PubSubSink;
-import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.FirestoreOptions;
+import com.google.cloud.pubsub.v1.Subscriber;
+import com.google.pubsub.v1.ProjectSubscriptionName;
+import com.google.pubsub.v1.PubsubMessage;
+import com.google.cloud.pubsub.v1.AckReplyConsumer;
+import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
 import java.io.Serializable;
 import java.time.Instant;
@@ -34,35 +36,22 @@ public class RideAnalyticsJob {
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        PubSubSource<String> ridesSource = PubSubSource.newBuilder()
-            .setProjectName(projectId)
-            .setSubscriptionName(ridesSubscription)
-            .setDeserializationSchema(new SimpleStringSchema())
-            .build();
+        // Custom Pub/Sub source function
+        DataStream<String> rideStream = env.addSource(new PubSubSourceFunction(projectId, ridesSubscription))
+                                           .name("gcp-pubsub-rides");
 
-        DataStream<String> rideStream = env.fromSource(
-            ridesSource,
-            WatermarkStrategy.noWatermarks(),
-            "gcp-pubsub-rides");
-
-        DataStream<Tuple2<String, Integer>> cityEvents = rideStream
-            .map(new ExtractCity());
+        DataStream<Tuple2<String, Integer>> cityEvents = rideStream.map(new ExtractCity());
 
         DataStream<RideAggregate> aggregates = cityEvents
-            .keyBy(value -> value.f0)
-            .window(TumblingProcessingTimeWindows.of(Time.minutes(1)))
-            .apply(new AggregateWindowFunction());
+                .keyBy(value -> value.f0)
+                .window(TumblingProcessingTimeWindows.of(Time.minutes(1)))
+                .apply(new AggregateWindowFunction());
 
         DataStream<String> aggregateJson = aggregates.map(new AggregateToJson());
 
-        PubSubSink<String> resultsSink = PubSubSink.newBuilder()
-            .setProjectName(projectId)
-            .setTopicName(resultsTopic)
-            .setSerializationSchema(new SimpleStringSchema())
-            .build();
-
-        aggregateJson.sinkTo(resultsSink);
         aggregates.addSink(new FirestoreSink(firestoreCollection));
+
+        // TODO: You can add Pub/Sub sink if needed using Google Cloud Pub/Sub client.
 
         env.execute("Ride Analytics Job (Pub/Sub -> Firestore)");
     }
@@ -87,9 +76,7 @@ public class RideAnalyticsJob {
                 if (cityValue != null) {
                     city = cityValue.toString();
                 }
-            } catch (Exception ignored) {
-                // fallback to unknown city
-            }
+            } catch (Exception ignored) {}
             return Tuple2.of(city, 1);
         }
     }
@@ -164,6 +151,44 @@ public class RideAnalyticsJob {
             map.put("windowEnd", Instant.ofEpochMilli(windowEndEpochMillis).toString());
             map.put("ttlSeconds", 3600);
             return map;
+        }
+    }
+
+    // === Custom Pub/Sub SourceFunction to avoid ambiguity ===
+    static class PubSubSourceFunction implements SourceFunction<String> {
+        private final String projectId;
+        private final String subscriptionId;
+        private transient Subscriber subscriber;
+        private volatile boolean running = true;
+
+        public PubSubSourceFunction(String projectId, String subscriptionId) {
+            this.projectId = projectId;
+            this.subscriptionId = subscriptionId;
+        }
+
+        @Override
+        public void run(SourceContext<String> ctx) {
+            ProjectSubscriptionName subName = ProjectSubscriptionName.of(projectId, subscriptionId);
+
+            com.google.cloud.pubsub.v1.MessageReceiver receiver = (PubsubMessage message, AckReplyConsumer consumer) -> {
+                ctx.collect(message.getData().toStringUtf8());
+                consumer.ack();
+            };
+
+            subscriber = Subscriber.newBuilder(subName, receiver).build();
+            subscriber.startAsync().awaitRunning();
+
+            while (running) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ignored) {}
+            }
+        }
+
+        @Override
+        public void cancel() {
+            running = false;
+            if (subscriber != null) subscriber.stopAsync();
         }
     }
 }

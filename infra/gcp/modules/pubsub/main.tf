@@ -3,7 +3,7 @@ data "google_project" "current" {
 }
 
 locals {
-  compute_default_sa = "${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+  compute_default_sa = "id-46339044134-compute-develop@careful-cosine-478715-a0.iam.gserviceaccount.com"
 }
 
 resource "google_pubsub_topic" "rides" {
@@ -78,4 +78,3 @@ resource "google_project_iam_member" "flink_firestore_user" {
   role    = "roles/datastore.user"
   member  = "serviceAccount:${local.compute_default_sa}"
 }
-

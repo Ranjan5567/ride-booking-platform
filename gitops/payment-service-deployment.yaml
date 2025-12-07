@@ -20,17 +20,17 @@ spec:
         prometheus.io/path: "/metrics"
     spec:
       containers:
-      - name: payment-service
-        image: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/payment-service:latest
-        ports:
-        - containerPort: 8004
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
+        - name: payment-service
+          image: 856228113345.dkr.ecr.ap-south-1.amazonaws.com/payment-service:latest
+          ports:
+            - containerPort: 8004
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
@@ -41,7 +41,6 @@ spec:
   selector:
     app: payment-service
   ports:
-  - port: 80
-    targetPort: 8004
+    - port: 80
+      targetPort: 8004
   type: ClusterIP
-

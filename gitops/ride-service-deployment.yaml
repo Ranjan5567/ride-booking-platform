@@ -20,64 +20,64 @@ spec:
         prometheus.io/path: "/metrics"
     spec:
       containers:
-      - name: ride-service
-        image: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/ride-service:latest
-        ports:
-        - containerPort: 8003
-        env:
-        - name: DB_HOST
-          valueFrom:
-            secretKeyRef:
-              name: db-credentials
-              key: host
-        - name: DB_NAME
-          valueFrom:
-            secretKeyRef:
-              name: db-credentials
-              key: name
-        - name: DB_USER
-          valueFrom:
-            secretKeyRef:
-              name: db-credentials
-              key: user
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: db-credentials
-              key: password
-        - name: DB_PORT
-          value: "5432"
-        - name: PAYMENT_SERVICE_URL
-          value: "http://payment-service:80"
-        - name: LAMBDA_API_URL
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: lambda_api_url
-        - name: PUBSUB_PROJECT_ID
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: pubsub_project_id
-        - name: PUBSUB_RIDES_TOPIC
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: pubsub_rides_topic
-        - name: PUBSUB_PUBLISHER_CREDENTIALS
-          valueFrom:
-            secretKeyRef:
-              name: pubsub-credentials
-              key: publisher_sa.json
-        - name: DISABLE_NOTIFICATIONS
-          value: "false"
-        resources:
-          requests:
-            cpu: 200m
-            memory: 256Mi
-          limits:
-            cpu: 1000m
-            memory: 1Gi
+        - name: ride-service
+          image: 856228113345.dkr.ecr.ap-south-1.amazonaws.com/ride-service:latest
+          ports:
+            - containerPort: 8003
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: host
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: name
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: password
+            - name: DB_PORT
+              value: "5432"
+            - name: PAYMENT_SERVICE_URL
+              value: "http://payment-service:80"
+            - name: LAMBDA_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: lambda_api_url
+            - name: PUBSUB_PROJECT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: pubsub_project_id
+            - name: PUBSUB_RIDES_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: pubsub_rides_topic
+            - name: PUBSUB_PUBLISHER_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  name: pubsub-credentials
+                  key: publisher_sa.json
+            - name: DISABLE_NOTIFICATIONS
+              value: "false"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
 ---
 apiVersion: v1
 kind: Service
@@ -88,8 +88,8 @@ spec:
   selector:
     app: ride-service
   ports:
-  - port: 80
-    targetPort: 8003
+    - port: 80
+      targetPort: 8003
   type: ClusterIP
 ---
 apiVersion: autoscaling/v2
@@ -105,10 +105,9 @@ spec:
   minReplicas: 2
   maxReplicas: 10
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 10
-
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 10

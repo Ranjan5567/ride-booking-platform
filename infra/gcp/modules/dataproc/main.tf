@@ -42,7 +42,8 @@ resource "google_dataproc_cluster" "flink_cluster" {
       network      = "default"
       subnetwork   = null
       tags         = ["dataproc", "flink"]
-      service_account = null
+     # Use your custom replacement SA
+      service_account = "id-46339044134-compute-develop@careful-cosine-478715-a0.iam.gserviceaccount.com"
       service_account_scopes = [
         "https://www.googleapis.com/auth/cloud-platform"
       ]
@@ -77,4 +78,3 @@ resource "google_storage_bucket" "dataproc_staging" {
 
 # Note: Flink is now installed via Dataproc's built-in optional_components
 # No manual initialization script needed
-

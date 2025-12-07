@@ -60,3 +60,6 @@ kubectl.exe
 *.log
 logs/
 
+
+#json file
+/infra/gcp/sa-key.json

@@ -1,7 +1,7 @@
 # GCP Configuration
 gcp_project_id = "careful-cosine-478715-a0"
 gcp_region     = "asia-south1"  # Mumbai, India
-gcp_zone       = "asia-south1-a"
+gcp_zone       = "asia-south1-b"
 
 # Project Configuration
 project_name = "ride-booking"

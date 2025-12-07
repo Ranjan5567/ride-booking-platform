@@ -12,4 +12,3 @@ variable "region" {
   description = "GCP region (for message storage policy hints)"
   type        = string
 }
-

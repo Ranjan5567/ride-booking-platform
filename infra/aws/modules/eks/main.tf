@@ -125,4 +125,3 @@ output "kubeconfig" {
     EOT
   sensitive = true
 }
-

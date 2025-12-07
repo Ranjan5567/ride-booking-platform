@@ -20,40 +20,40 @@ spec:
         prometheus.io/path: "/metrics"
     spec:
       containers:
-      - name: user-service
-        image: 943812325535.dkr.ecr.ap-south-1.amazonaws.com/user-service:latest
-        ports:
-        - containerPort: 8001
-        env:
-        - name: DB_HOST
-          valueFrom:
-            secretKeyRef:
-              name: db-credentials
-              key: host
-        - name: DB_NAME
-          valueFrom:
-            secretKeyRef:
-              name: db-credentials
-              key: name
-        - name: DB_USER
-          valueFrom:
-            secretKeyRef:
-              name: db-credentials
-              key: user
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: db-credentials
-              key: password
-        - name: DB_PORT
-          value: "5432"
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
+        - name: user-service
+          image: 856228113345.dkr.ecr.ap-south-1.amazonaws.com/user-service:latest
+          ports:
+            - containerPort: 8001
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: host
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: name
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: password
+            - name: DB_PORT
+              value: "5432"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
@@ -64,8 +64,8 @@ spec:
   selector:
     app: user-service
   ports:
-  - port: 80
-    targetPort: 8001
+    - port: 80
+      targetPort: 8001
   type: ClusterIP
 ---
 apiVersion: autoscaling/v2
@@ -81,10 +81,9 @@ spec:
   minReplicas: 2
   maxReplicas: 10
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
